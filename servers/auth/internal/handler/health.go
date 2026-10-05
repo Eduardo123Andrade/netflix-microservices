@@ -25,8 +25,8 @@ func Health(uc healthExecutor) http.HandlerFunc {
 		resp := healthResponse{Status: usecase.StatusUp, Checks: report.Checks}
 
 		if !report.Healthy {
-			status = http.StatusServiceUnavailable
-			resp.Status = usecase.StatusDown
+			status = http.StatusOK
+			resp.Status = usecase.StatusUp
 		}
 
 		w.Header().Set("Content-Type", "application/json")

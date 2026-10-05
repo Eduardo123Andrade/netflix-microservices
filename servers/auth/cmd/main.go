@@ -23,13 +23,17 @@ func main() {
 
 	defer cancel()
 
-	pool, err := database.Connect(ctx, c.DB)
+	pool, err := database.NewPool(ctx, c.DB)
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	defer pool.Close()
+
+	if err := database.Connect(ctx, pool); err != nil {
+		log.Printf("aviso: banco indisponível na subida, seguindo mesmo assim: %v", err)
+	}
 
 	r := router.New(router.Deps{DB: pool})
 

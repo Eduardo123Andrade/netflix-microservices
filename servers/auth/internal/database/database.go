@@ -11,7 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func Connect(ctx context.Context, cfg config.Database) (*pgxpool.Pool, error) {
+func NewPool(ctx context.Context, cfg config.Database) (*pgxpool.Pool, error) {
 	u := url.URL{
 		Scheme: "postgres",
 		User:   url.UserPassword(cfg.User, cfg.Password),
@@ -28,13 +28,16 @@ func Connect(ctx context.Context, cfg config.Database) (*pgxpool.Pool, error) {
 		return nil, e
 	}
 
-	err = pool.Ping(ctx)
+	return pool, nil
+}
+
+func Connect(ctx context.Context, pool *pgxpool.Pool) error {
+	err := pool.Ping(ctx)
 
 	if err != nil {
 		e := fmt.Errorf("não foi possivel fazer ping no banco: %w", err)
-		pool.Close()
-		return nil, e
+		return e
 	}
 
-	return pool, nil
+	return nil
 }
