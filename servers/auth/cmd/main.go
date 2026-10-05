@@ -31,7 +31,7 @@ func main() {
 
 	defer pool.Close()
 
-	r := router.New()
+	r := router.New(router.Deps{DB: pool})
 
 	p := fmt.Sprintf(":%d", c.Port)
 	listener, err := net.Listen("tcp", p)

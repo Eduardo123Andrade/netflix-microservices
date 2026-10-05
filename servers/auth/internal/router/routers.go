@@ -1,14 +1,19 @@
 package router
 
 import (
-	"auth/internal/handler/health"
 	"net/http"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func New() http.Handler {
+type Deps struct {
+	DB *pgxpool.Pool
+}
+
+func New(deps Deps) http.Handler {
 	api := http.NewServeMux()
 
-	api.HandleFunc("GET /api/health", health.Health)
+	registerHealth(api, deps)
 
 	return api
 }
