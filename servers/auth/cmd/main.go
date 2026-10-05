@@ -1,22 +1,31 @@
 package main
 
 import (
+	"auth/internal/config"
 	"auth/internal/router"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
 )
 
 func main() {
-	r := router.New()
-
-	listener, err := net.Listen("tcp", ":8080")
+	c, err := config.Load()
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	log.Println("Server running in http://localhost:8080/api")
+	r := router.New()
+
+	p := fmt.Sprintf(":%d", c.Port)
+	listener, err := net.Listen("tcp", p)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Printf("Server running in http://localhost:%d/api\n", c.Port)
 
 	err = http.Serve(listener, r)
 

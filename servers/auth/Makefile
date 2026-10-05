@@ -1,5 +1,9 @@
+include .env
+export
+
 COMPOSE_DEV := container/docker-compose.dev.yml
 ENV := --env-file .env
+
 
 .PHONY: db-up-dev db-down-dev run
 
