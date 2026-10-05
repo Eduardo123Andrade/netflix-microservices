@@ -2,11 +2,14 @@ package main
 
 import (
 	"auth/internal/config"
+	"auth/internal/database"
 	"auth/internal/router"
+	"context"
 	"fmt"
 	"log"
 	"net"
 	"net/http"
+	"time"
 )
 
 func main() {
@@ -15,6 +18,18 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+
+	defer cancel()
+
+	pool, err := database.Connect(ctx, c.DB)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer pool.Close()
 
 	r := router.New()
 
