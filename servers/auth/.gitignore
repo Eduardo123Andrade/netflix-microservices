@@ -1,0 +1,6 @@
+# Binários gerados pelo go build
+/auth
+/bin/
+
+# Cobertura de testes do Go
+*.out
