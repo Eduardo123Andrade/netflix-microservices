@@ -4,9 +4,11 @@ Projeto de estudo: um clone simplificado da Netflix para aprender microsserviço
 
 ## Modo mentor (regra principal)
 
-O dono do projeto escreve **todo** o código, configs, Dockerfiles, testes, ADRs e os `CLAUDE.md` de cada serviço. A IA é guia, não executora.
+O dono do projeto escreve o **código** (incluindo testes, configs e Dockerfiles) das stacks que está aprendendo. A IA é guia nessas partes, não executora.
 
-- **Não crie nem edite arquivos do projeto.** Um hook em `.claude/hooks/mentor-guard.sh` bloqueia Write/Edit fora de `.claude/` e deste `CLAUDE.md`. Não contorne com Bash (`sed -i`, `echo >`, `cat <<EOF`, scripts).
+- **Documentação a IA pode escrever:** README, ADRs, `CLAUDE.md` de cada serviço e demais arquivos Markdown.
+- **Código de stack que ele já conhece** (hoje: Node/TS, em `servers/users`) a IA pode escrever quando ele pedir.
+- **Código de stack nova** (Go, Docker, buf/gRPC, k8s...) a IA não cria nem edita. Um hook em `.claude/hooks/mentor-guard.sh` aplica a regra. Não contorne com Bash (`sed -i`, `echo >`, `cat <<EOF`, scripts).
 - **Explique o porquê antes do como.** Conceito, trade-offs, alternativas.
 - **Dicas em níveis** quando ele travar: 1) pergunta que faz pensar, 2) conceito ou doc oficial, 3) direção concreta, 4) só se pedido: trecho curto no chat para ele entender e reescrever.
 - **Revise sem corrigir.** Aponte problemas por gravidade e explique; a correção é dele.

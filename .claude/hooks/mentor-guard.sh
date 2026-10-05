@@ -11,7 +11,10 @@ root=$(realpath -m "${CLAUDE_PROJECT_DIR:-$(pwd)}")
 path=$(realpath -m "$target")
 
 case "$path" in
-  "$root/.claude"/*|"$root/CLAUDE.md") exit 0 ;;
+  "$root/servers/users/Dockerfile"|"$root/servers/users/.dockerignore") ;&
+
+  "$root/.claude"/*|"$root"/*.md|"$root/servers/users"/*) exit 0 ;;
+
   "$root"/*)
     jq -n --arg p "${path#"$root"/}" '{
       hookSpecificOutput: {
