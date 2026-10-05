@@ -1,0 +1,7 @@
+# Segredos (o .env.example é versionado)
+.env
+.env.*
+!.env.example
+
+# Cobertura de testes
+coverage/
