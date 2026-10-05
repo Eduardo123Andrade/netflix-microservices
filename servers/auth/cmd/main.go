@@ -1,16 +1,14 @@
 package main
 
 import (
-	"auth/internal/handler/health"
+	"auth/internal/router"
 	"log"
 	"net"
 	"net/http"
 )
 
 func main() {
-	mux := http.NewServeMux()
-
-	mux.HandleFunc("GET /health", health.Health)
+	r := router.New()
 
 	listener, err := net.Listen("tcp", ":8080")
 
@@ -18,9 +16,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	log.Println("Server running in http://localhost:8080")
+	log.Println("Server running in http://localhost:8080/api")
 
-	err = http.Serve(listener, mux)
+	err = http.Serve(listener, r)
 
 	if err != nil {
 		log.Fatal(err)
