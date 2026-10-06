@@ -7,12 +7,12 @@ ENV := --env-file .env
 APP_VERSION := $(shell cat VERSION)
 LDFLAGS := -X auth/internal/buildinfo.Version=$(APP_VERSION) 
 
-.PHONY: db-up-dev db-down-dev run
+.PHONY: dev-db-up dev-db-down run
 
-db-up-dev:
+dev-db-up:
 	docker compose $(ENV) -f $(COMPOSE_DEV) up -d
 
-db-down-dev:
+dev-db-down:
 	docker compose $(ENV) -f $(COMPOSE_DEV) down
 
 run:
