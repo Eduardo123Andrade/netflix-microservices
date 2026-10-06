@@ -5,3 +5,7 @@
 
 # Cobertura de testes
 coverage/
+
+
+# learning things
+.tests
