@@ -8,6 +8,13 @@ import (
 	"strings"
 )
 
+var (
+	ErrRequired   = errors.New("is required")
+	ErrEmpty      = errors.New("cannot be empty")
+	ErrNotInteger = errors.New("must be an integer")
+	ErrOutOfRange = errors.New("out of range")
+)
+
 type Reader struct {
 	errs []error
 }
@@ -16,14 +23,14 @@ func (r *Reader) lookup(name string) (string, bool) {
 	value, ok := os.LookupEnv(name)
 
 	if !ok {
-		r.errs = append(r.errs, fmt.Errorf("%s é obrigatorio", name))
+		r.errs = append(r.errs, fmt.Errorf("%s %w", name, ErrRequired))
 		return "", false
 	}
 
 	value = strings.TrimSpace(value)
 
 	if value == "" {
-		r.errs = append(r.errs, fmt.Errorf("%s não pode ser vazia", name))
+		r.errs = append(r.errs, fmt.Errorf("%s %w", name, ErrEmpty))
 		return "", false
 	}
 
@@ -42,7 +49,7 @@ func (r *Reader) IntRange(name string, min, max int) int {
 	}
 
 	if v < min || v > max {
-		r.errs = append(r.errs, fmt.Errorf("%s deve estar entre %d e %d, recebido %d", name, min, max, v))
+		r.errs = append(r.errs, fmt.Errorf("%s %w [%d, %d], got %d", name, ErrOutOfRange, min, max, v))
 		return 0
 	}
 
@@ -57,7 +64,7 @@ func (r *Reader) parseInt(name string) (int, bool) {
 
 	v, err := strconv.Atoi(value)
 	if err != nil {
-		r.errs = append(r.errs, fmt.Errorf("%s deve ser um número inteiro, recebido %q", name, value))
+		r.errs = append(r.errs, fmt.Errorf("%s %w, got %q", name, ErrNotInteger, value))
 		return 0, false
 	}
 
