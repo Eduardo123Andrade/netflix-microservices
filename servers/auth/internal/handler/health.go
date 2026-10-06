@@ -13,8 +13,9 @@ type healthExecutor interface {
 }
 
 type healthResponse struct {
-	Status usecase.Status            `json:"status"`
-	Checks map[string]usecase.Status `json:"checks"`
+	Status  usecase.Status            `json:"status"`
+	Version string                    `json:"version"`
+	Checks  map[string]usecase.Status `json:"checks"`
 }
 
 func Health(uc healthExecutor) http.HandlerFunc {
@@ -22,7 +23,11 @@ func Health(uc healthExecutor) http.HandlerFunc {
 		report := uc.Execute(r.Context())
 
 		status := http.StatusOK
-		resp := healthResponse{Status: usecase.StatusUp, Checks: report.Checks}
+		resp := healthResponse{
+			Status:  usecase.StatusUp,
+			Version: report.Version,
+			Checks:  report.Checks,
+		}
 
 		if !report.Healthy {
 			status = http.StatusOK

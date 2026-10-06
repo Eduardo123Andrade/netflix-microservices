@@ -17,6 +17,7 @@ const (
 
 type HealthReport struct {
 	Healthy bool
+	Version string
 	Checks  map[string]Status
 }
 type healthChecker interface {
@@ -24,11 +25,12 @@ type healthChecker interface {
 }
 
 type Health struct {
-	db healthChecker
+	db      healthChecker
+	version string
 }
 
-func NewHealth(db healthChecker) *Health {
-	return &Health{db: db}
+func NewHealth(db healthChecker, version string) *Health {
+	return &Health{db: db, version: version}
 }
 
 func (h *Health) Execute(ctx context.Context) HealthReport {
@@ -37,6 +39,7 @@ func (h *Health) Execute(ctx context.Context) HealthReport {
 
 	report := HealthReport{
 		Healthy: true,
+		Version: h.version,
 		Checks:  map[string]Status{"database": StatusUp},
 	}
 
