@@ -13,7 +13,7 @@ path=$(realpath -m "$target")
 case "$path" in
   "$root/servers/users/Dockerfile"|"$root/servers/users/.dockerignore") ;&
 
-  "$root/.claude"/*|"$root"/*.md|"$root/servers/users"/*) exit 0 ;;
+  "$root/.claude"/*|"$root"/*.md |"$root"/*.sql |"$root/servers/users"/*) exit 0 ;;
 
   "$root"/*)
     jq -n --arg p "${path#"$root"/}" '{
