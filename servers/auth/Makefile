@@ -6,6 +6,7 @@ ENV := --env-file .env
 
 APP_VERSION := $(shell cat VERSION)
 LDFLAGS := -X auth/internal/buildinfo.Version=$(APP_VERSION) 
+COVER_PKGS = $(shell go list ./... | grep -v cmd | grep -v buildinfo | paste -sd, -)
 
 .PHONY: dev-db-up dev-db-down run test test-integration test-coverage
 
@@ -25,5 +26,5 @@ test-integration:
 	go test -tags integration ./...
 
 test-coverage:
-	go test -tags integration -coverprofile=cover.out ./...
+	go test -tags integration -coverpkg $(COVER_PKGS) -coverprofile=cover.out ./...
 	go tool cover -func=cover.out
