@@ -4,12 +4,20 @@
 package testutil
 
 import (
+	"auth/db/migrations"
 	"auth/internal/config"
 	"context"
+	"errors"
 	"testing"
 
+	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
+
+	"fmt"
+
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/pgx/v5"
 )
 
 // Mesma imagem do container/docker-compose.dev.yml.
@@ -51,4 +59,28 @@ func StartPostgres(t *testing.T) (*postgres.PostgresContainer, config.Database) 
 	cfg.Port = int(port.Num())
 
 	return ctr, cfg
+}
+
+func MigrateUp(t *testing.T, cfg config.Database) {
+	t.Helper()
+
+	src, err := iofs.New(migrations.EmbedFS, ".")
+	if err != nil {
+		t.Fatalf("migrations source: %v", err)
+	}
+
+	dbURL := fmt.Sprintf("pgx5://%s:%s@%s:%d/%s?sslmode=disable",
+		cfg.User, cfg.Password, cfg.Host, cfg.Port, cfg.Name)
+
+	m, err := migrate.NewWithSourceInstance("iofs", src, dbURL)
+
+	if err != nil {
+		t.Fatalf("migrate init: %v", err)
+	}
+
+	defer m.Close()
+
+	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		t.Fatalf("migrate up: %v", err)
+	}
 }
