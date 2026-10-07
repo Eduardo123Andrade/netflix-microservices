@@ -3,6 +3,7 @@ package database
 import (
 	"auth/internal/config"
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -10,6 +11,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+var ErrNewPool = errors.New("unable to create database connections")
 
 func NewPool(ctx context.Context, cfg config.Database) (*pgxpool.Pool, error) {
 	u := url.URL{
@@ -24,7 +27,7 @@ func NewPool(ctx context.Context, cfg config.Database) (*pgxpool.Pool, error) {
 	pool, err := pgxpool.New(ctx, connString)
 
 	if err != nil {
-		e := fmt.Errorf("não foi possivel criar a conexão com o banco: %w", err)
+		e := fmt.Errorf("%w: %w", ErrNewPool, err)
 		return nil, e
 	}
 
