@@ -7,7 +7,7 @@ ENV := --env-file .env
 APP_VERSION := $(shell cat VERSION)
 LDFLAGS := -X auth/internal/buildinfo.Version=$(APP_VERSION) 
 
-.PHONY: dev-db-up dev-db-down run test test-integration
+.PHONY: dev-db-up dev-db-down run test test-integration test-coverage
 
 dev-db-up:
 	docker compose $(ENV) -f $(COMPOSE_DEV) up -d
@@ -23,3 +23,7 @@ test:
 
 test-integration:
 	go test -tags integration ./...
+
+test-coverage:
+	go test -tags integration -coverprofile=cover.out ./...
+	go tool cover -func=cover.out
