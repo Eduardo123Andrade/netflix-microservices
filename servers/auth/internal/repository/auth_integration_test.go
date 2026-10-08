@@ -6,6 +6,7 @@ import (
 	"auth/internal/database"
 	"auth/internal/testutil"
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -29,11 +30,10 @@ func newTestPool(t *testing.T) *pgxpool.Pool {
 }
 
 func TestCreateAuth(t *testing.T) {
+	pool := newTestPool(t)
+
 	t.Run("Create Auth", func(t *testing.T) {
-		pool := newTestPool(t)
-
 		ctx := context.Background()
-
 		a := NewAuthRepository(pool)
 
 		expect := AuthData{
@@ -83,5 +83,36 @@ func TestCreateAuth(t *testing.T) {
 			t.Error("created_at is zero, want it set by the database")
 		}
 
+	})
+
+	t.Run("Error email already exists", func(t *testing.T) {
+		a := NewAuthRepository(pool)
+		ctx := context.Background()
+
+		expect := AuthData{
+			ID:           "01a11c11-8e01-736d-9c09-a76d396bbc2f",
+			Email:        "teste2@teste.com",
+			PasswordHash: "$2a$10$fakehash",
+			UserID:       "01a11ce9-8e01-736d-9c09-a76d396bbc2f",
+		}
+
+		err := a.CreateAuth(ctx, expect)
+
+		if err != nil {
+			t.Fatalf("CreateAuth() unexpected error: %v", err)
+		}
+
+		dub := expect
+		dub.ID = "01a11c12-8e01-736d-9c09-a76d396bbc2f"
+
+		err = a.CreateAuth(ctx, dub)
+
+		if err == nil {
+			t.Fatalf("CreateAuth() = error nil; want = err")
+		}
+
+		if !errors.Is(err, ErrAuthAlreadyExists) {
+			t.Fatalf("CreateAuth() = error %v; want = %v", err, ErrAuthAlreadyExists)
+		}
 	})
 }
