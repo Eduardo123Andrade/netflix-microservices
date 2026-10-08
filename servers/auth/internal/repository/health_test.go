@@ -11,6 +11,7 @@ import (
 )
 
 func TestHealthCheck(t *testing.T) {
+	t.Parallel()
 	ctr, cfg := testutil.StartPostgres(t)
 
 	pool, err := database.NewPool(context.Background(), cfg)

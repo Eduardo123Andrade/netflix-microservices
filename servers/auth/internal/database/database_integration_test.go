@@ -14,11 +14,11 @@ import (
 )
 
 func TestConnect(t *testing.T) {
+	t.Parallel()
 	_, cfg := testutil.StartPostgres(t)
+	pool := newTestPool(t, cfg)
 
 	t.Run("banco disponível", func(t *testing.T) {
-		pool := newTestPool(t, cfg)
-
 		if err := Connect(context.Background(), pool); err != nil {
 			t.Errorf("Connect() error = %v; want nil", err)
 		}
@@ -42,8 +42,6 @@ func TestConnect(t *testing.T) {
 	})
 
 	t.Run("contexto cancelado", func(t *testing.T) {
-		pool := newTestPool(t, cfg)
-
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 

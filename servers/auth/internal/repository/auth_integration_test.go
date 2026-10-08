@@ -30,6 +30,7 @@ func newTestPool(t *testing.T) *pgxpool.Pool {
 }
 
 func TestCreateAuth(t *testing.T) {
+	t.Parallel()
 	pool := newTestPool(t)
 
 	t.Run("Create Auth", func(t *testing.T) {
