@@ -115,4 +115,28 @@ func TestCreateAuth(t *testing.T) {
 			t.Fatalf("CreateAuth() = error %v; want = %v", err, ErrAuthAlreadyExists)
 		}
 	})
+
+	t.Run("Error context canceled", func(t *testing.T) {
+		a := NewAuthRepository(pool)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		err := a.CreateAuth(ctx, AuthData{
+			ID:           "01a11c12-8e01-736d-9c09-a76d396bbc2f",
+			Email:        "teste3@teste.com",
+			PasswordHash: "$2a$10$fakehash",
+			UserID:       "01a11ce9-8e01-736d-9c09-a76d396bbc2f",
+		})
+
+		if err == nil {
+			t.Fatal("CreateAuth() = error nil; want error")
+		}
+		if errors.Is(err, ErrAuthAlreadyExists) {
+			t.Fatalf("CreateAuth() = %v; want a non-duplicate error", err)
+		}
+		if !errors.Is(err, context.Canceled) {
+			t.Errorf("CreateAuth() = %v; want it to wrap context.Canceled", err)
+		}
+	})
 }
