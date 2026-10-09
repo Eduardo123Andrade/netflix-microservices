@@ -56,9 +56,9 @@ func decodeError(t *testing.T, rec *httptest.ResponseRecorder) string {
 }
 
 const validBody = `{
+	"name": "Eduardo",
 	"email": "teste@teste.com",
-	"password_hash": "$2a$10$fakehash",
-	"user_id": "01a11ce9-8e01-736d-9c09-a76d396bbc2f"
+	"password": "Senha@123"
 }`
 
 func TestCreateAuthHandler(t *testing.T) {
@@ -78,9 +78,9 @@ func TestCreateAuthHandler(t *testing.T) {
 		}
 
 		want := usecase.AuthData{
-			Email:        "teste@teste.com",
-			PasswordHash: "$2a$10$fakehash",
-			UserID:       "01a11ce9-8e01-736d-9c09-a76d396bbc2f",
+			Name:     "Eduardo",
+			Email:    "teste@teste.com",
+			Password: "Senha@123",
 		}
 		if uc.data != want {
 			t.Errorf("Execute() data = %+v, want %+v", uc.data, want)
@@ -140,16 +140,23 @@ func TestCreateAuthHandler(t *testing.T) {
 				wantError:  entity.ErrInvalidEmail.Error(),
 			},
 			{
-				name:       "invalid user id",
-				err:        fmt.Errorf("create auth: %w", entity.ErrInvalidUserID),
+				name:       "invalid password",
+				err:        fmt.Errorf("create auth: %w", entity.ErrInvalidPassword),
 				wantStatus: http.StatusBadRequest,
-				wantError:  entity.ErrInvalidUserID.Error(),
+				wantError:  entity.ErrInvalidPassword.Error(),
 			},
 			{
-				name:       "invalid email and user id",
-				err:        fmt.Errorf("create auth: %w", errors.Join(entity.ErrInvalidEmail, entity.ErrInvalidUserID)),
+				name:       "invalid email and password",
+				err:        fmt.Errorf("create auth: %w", errors.Join(entity.ErrInvalidEmail, entity.ErrInvalidPassword)),
 				wantStatus: http.StatusBadRequest,
-				wantError:  entity.ErrInvalidUserID.Error(),
+				wantError:  entity.ErrInvalidPassword.Error(),
+			},
+			{
+				// O userID vem do serviço users: ID inválido é falha interna.
+				name:       "invalid user id from users service",
+				err:        fmt.Errorf("create auth: new auth: %w", entity.ErrInvalidUserID),
+				wantStatus: http.StatusInternalServerError,
+				wantError:  "internal error",
 			},
 			{
 				name:       "email already registered",

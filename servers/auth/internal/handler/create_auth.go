@@ -15,16 +15,12 @@ type createAuthExecutor interface {
 	Execute(ctx context.Context, data usecase.AuthData) error
 }
 
-type authResponse struct {
-	Message string `json:"message"`
-}
-
 const maxBodyBytes = 1 << 20 // 1 MB
 
 type createAuthRequest struct {
-	Email        string `json:"email"`
-	PasswordHash string `json:"password_hash"`
-	UserID       string `json:"user_id"`
+	Name     string `json:"name"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 
 type errorResponse struct {
@@ -45,15 +41,15 @@ func CreateAuth(uc createAuthExecutor) http.HandlerFunc {
 		}
 
 		err := uc.Execute(r.Context(), usecase.AuthData{
-			Email:        req.Email,
-			PasswordHash: req.PasswordHash,
-			UserID:       req.UserID,
+			Name:     req.Name,
+			Email:    req.Email,
+			Password: req.Password,
 		})
 
 		switch {
 		case err == nil:
 			w.WriteHeader(http.StatusCreated)
-		case errors.Is(err, entity.ErrInvalidEmail), errors.Is(err, entity.ErrInvalidUserID):
+		case errors.Is(err, entity.ErrInvalidEmail), errors.Is(err, entity.ErrInvalidPassword):
 			writeJSON(w, http.StatusBadRequest, errorResponse{Error: err.Error()})
 		case errors.Is(err, repository.ErrAuthAlreadyExists):
 			writeJSON(w, http.StatusConflict, errorResponse{Error: "email already registered"})
@@ -61,7 +57,6 @@ func CreateAuth(uc createAuthExecutor) http.HandlerFunc {
 			log.Printf("create auth: %v", err)
 			writeJSON(w, http.StatusInternalServerError, errorResponse{Error: "internal error"})
 		}
-
 	}
 }
 

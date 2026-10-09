@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"golang.org/x/crypto/bcrypt"
 )
 
 const createAuthPath = "/api/auth/create_user"
@@ -41,8 +42,8 @@ func TestCreateAuthEndpoint(t *testing.T) {
 
 		status, body := postJSON(t, url, `{
 			"email": "e2e1@teste.com",
-			"password_hash": "$2a$10$fakehash",
-			"user_id": "01a11ce9-8e01-736d-9c09-a76d396bbc2f"
+			"name": "Eduardo",
+			"password": "Senha@123"
 		}`)
 
 		if status != http.StatusCreated {
@@ -53,7 +54,21 @@ func TestCreateAuthEndpoint(t *testing.T) {
 		}
 
 		if n := countAuthByEmail(t, pool, "e2e1@teste.com"); n != 1 {
-			t.Errorf("rows with email = %d; want 1", n)
+			t.Fatalf("rows with email = %d; want 1", n)
+		}
+
+		var hash string
+		err := pool.QueryRow(context.Background(),
+			"SELECT password_hash FROM auth WHERE email = $1", "e2e1@teste.com",
+		).Scan(&hash)
+		if err != nil {
+			t.Fatalf("select password_hash: %v", err)
+		}
+		if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte("Senha@123")); err != nil {
+			t.Errorf("password_hash = %q; want a bcrypt hash of the password: %v", hash, err)
+		}
+		if cost, _ := bcrypt.Cost([]byte(hash)); cost != 4 {
+			t.Errorf("bcrypt cost = %d; want 4 (the configured cost)", cost)
 		}
 	})
 
@@ -62,8 +77,8 @@ func TestCreateAuthEndpoint(t *testing.T) {
 
 		body := `{
 			"email": "e2e2@teste.com",
-			"password_hash": "$2a$10$fakehash",
-			"user_id": "01a11ce9-8e01-736d-9c09-a76d396bbc2f"
+			"name": "Eduardo",
+			"password": "Senha@123"
 		}`
 
 		if status, resp := postJSON(t, url, body); status != http.StatusCreated {
@@ -88,8 +103,8 @@ func TestCreateAuthEndpoint(t *testing.T) {
 
 		status, resp := postJSON(t, url, `{
 			"email": "e2e3.teste.com",
-			"password_hash": "$2a$10$fakehash",
-			"user_id": "01a11ce9-8e01-736d-9c09-a76d396bbc2f"
+			"name": "Eduardo",
+			"password": "Senha@123"
 		}`)
 
 		if status != http.StatusBadRequest {

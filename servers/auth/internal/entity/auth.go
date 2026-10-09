@@ -14,22 +14,35 @@ type Auth struct {
 }
 
 var (
-	ErrInvalidEmail  = errors.New("invalid email")
-	ErrInvalidUserID = errors.New("invalid user id")
+	ErrInvalidEmail    = errors.New("invalid email")
+	ErrInvalidPassword = errors.New("invalid password")
+	ErrInvalidUserID   = errors.New("invalid user id")
 )
 
-func NewAuth(email, passwordHash, userID string) (Auth, error) {
-	var errs []error
-
+func ValidateEmail(email string) error {
 	if !utils.IsEmail(email) {
-		errs = append(errs, ErrInvalidEmail)
+		return ErrInvalidEmail
 	}
-	if !utils.IsUUIDV7(userID) {
-		errs = append(errs, ErrInvalidUserID)
-	}
+	return nil
+}
 
-	if len(errs) > 0 {
-		return Auth{}, errors.Join(errs...)
+func ValidatePassword(password string) error {
+	if !utils.IsValidPassword(password) {
+		return ErrInvalidPassword
+	}
+	return nil
+}
+
+func ValidateUserID(userID string) error {
+	if !utils.IsUUIDV7(userID) {
+		return ErrInvalidUserID
+	}
+	return nil
+}
+
+func NewAuth(email, passwordHash, userID string) (Auth, error) {
+	if err := errors.Join(ValidateEmail(email), ValidateUserID(userID)); err != nil {
+		return Auth{}, err
 	}
 
 	id, err := utils.GenerateUUID()

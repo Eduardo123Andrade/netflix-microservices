@@ -35,7 +35,7 @@ func main() {
 		log.Printf("aviso: banco indisponível na subida, seguindo mesmo assim: %v", err)
 	}
 
-	r := router.New(router.Deps{DB: pool})
+	r := router.New(router.Deps{DB: pool, Cost: c.Cost})
 
 	p := fmt.Sprintf(":%d", c.Port)
 	listener, err := net.Listen("tcp", p)

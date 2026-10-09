@@ -9,6 +9,8 @@ import (
 	"testing"
 )
 
+const fakeUserID = "01a11ce9-8e01-736d-9c09-a76d396bbc2f"
+
 // fakeAuthRepository substitui o repositório real: devolve os erros
 // configurados e registra as chamadas para o teste conferir.
 type fakeAuthRepository struct {
@@ -40,37 +42,86 @@ func (f *fakeAuthRepository) CreateAuth(ctx context.Context, data entity.Auth) e
 // previsível, para o teste conferir o que foi gravado.
 type fakeHasher struct {
 	err error
+
+	called   bool
+	password string
 }
 
-func (f *fakeHasher) Hash(pass string) (string, error) {
+func (f *fakeHasher) Hash(password string) (string, error) {
+	f.called = true
+	f.password = password
 	if f.err != nil {
 		return "", f.err
 	}
-	return "hashed:" + pass, nil
+	return "hashed:" + password, nil
+}
+
+// fakeUserService substitui o serviço users: devolve o userID e os erros
+// configurados e registra as chamadas, inclusive a compensação.
+type fakeUserService struct {
+	userID    string
+	createErr error
+	deleteErr error
+
+	createCalled  bool
+	createName    string
+	createEmail   string
+	deleteCalled  bool
+	deletedUserID string
+}
+
+func (f *fakeUserService) CreateUser(ctx context.Context, name, email string) (string, error) {
+	f.createCalled = true
+	f.createName = name
+	f.createEmail = email
+	if f.createErr != nil {
+		return "", f.createErr
+	}
+	return f.userID, nil
+}
+
+func (f *fakeUserService) DeleteUser(ctx context.Context, userID string) error {
+	f.deleteCalled = true
+	f.deletedUserID = userID
+	return f.deleteErr
+}
+
+// deps monta os três falsos no caminho feliz; cada caso muda só o que testa.
+func deps() (*fakeAuthRepository, *fakeHasher, *fakeUserService) {
+	return &fakeAuthRepository{findErr: repository.ErrAuthNotFound},
+		&fakeHasher{},
+		&fakeUserService{userID: fakeUserID}
+}
+
+var input = AuthData{
+	Name:     "Eduardo",
+	Email:    "teste@teste.com",
+	Password: "Senha@123",
 }
 
 func TestCreateAuthUseCase(t *testing.T) {
 	t.Parallel()
 
-	input := AuthData{
-		Email:        "teste@teste.com",
-		PasswordHash: "Senha@123",
-		UserID:       "01a11ce9-8e01-736d-9c09-a76d396bbc2f",
-	}
-
-	t.Run("Creates auth when email is free", func(t *testing.T) {
+	t.Run("Creates user and auth", func(t *testing.T) {
 		t.Parallel()
 
-		repo := &fakeAuthRepository{findErr: repository.ErrAuthNotFound}
-		uc := NewCreateAuthUseCase(repo, &fakeHasher{})
-
-		err := uc.Execute(context.Background(), input)
+		repo, hs, us := deps()
+		err := NewCreateAuthUseCase(repo, hs, us).Execute(context.Background(), input)
 		if err != nil {
 			t.Fatalf("Execute() unexpected error: %v", err)
 		}
 
 		if repo.findEmail != input.Email {
 			t.Errorf("FindByEmail() email = %q, want %q", repo.findEmail, input.Email)
+		}
+		if hs.password != input.Password {
+			t.Errorf("Hash() password = %q, want %q", hs.password, input.Password)
+		}
+		if us.createName != input.Name || us.createEmail != input.Email {
+			t.Errorf("CreateUser() = (%q, %q), want (%q, %q)", us.createName, us.createEmail, input.Name, input.Email)
+		}
+		if us.deleteCalled {
+			t.Error("DeleteUser() called, want no compensation on success")
 		}
 		if !repo.createCalled {
 			t.Fatal("CreateAuth() not called, want it called")
@@ -83,119 +134,182 @@ func TestCreateAuthUseCase(t *testing.T) {
 		if got.Email != input.Email {
 			t.Errorf("email = %q, want %q", got.Email, input.Email)
 		}
-		if want := "hashed:" + input.PasswordHash; got.PasswordHash != want {
+		if want := "hashed:" + input.Password; got.PasswordHash != want {
 			t.Errorf("password_hash = %q, want %q (the plain password must be hashed)", got.PasswordHash, want)
 		}
-		if got.UserID != input.UserID {
-			t.Errorf("user_id = %q, want %q", got.UserID, input.UserID)
-		}
-	})
-
-	t.Run("Error email already exists", func(t *testing.T) {
-		t.Parallel()
-
-		repo := &fakeAuthRepository{findErr: nil}
-		uc := NewCreateAuthUseCase(repo, &fakeHasher{})
-
-		err := uc.Execute(context.Background(), input)
-		if !errors.Is(err, repository.ErrAuthAlreadyExists) {
-			t.Fatalf("Execute() = error %v; want %v", err, repository.ErrAuthAlreadyExists)
-		}
-		if repo.createCalled {
-			t.Error("CreateAuth() called, want it skipped when email exists")
-		}
-	})
-
-	t.Run("Error finding email is not treated as free email", func(t *testing.T) {
-		t.Parallel()
-
-		dbErr := errors.New("connection refused")
-		repo := &fakeAuthRepository{findErr: dbErr}
-		uc := NewCreateAuthUseCase(repo, &fakeHasher{})
-
-		err := uc.Execute(context.Background(), input)
-		if !errors.Is(err, dbErr) {
-			t.Fatalf("Execute() = error %v; want it to wrap %v", err, dbErr)
-		}
-		if errors.Is(err, repository.ErrAuthAlreadyExists) {
-			t.Errorf("Execute() = %v; want an error other than already exists", err)
-		}
-		if repo.createCalled {
-			t.Error("CreateAuth() called, want it skipped when FindByEmail fails")
-		}
-	})
-
-	t.Run("Error email taken between check and save", func(t *testing.T) {
-		t.Parallel()
-
-		repo := &fakeAuthRepository{
-			findErr:   repository.ErrAuthNotFound,
-			createErr: repository.ErrAuthAlreadyExists,
-		}
-		uc := NewCreateAuthUseCase(repo, &fakeHasher{})
-
-		err := uc.Execute(context.Background(), input)
-		if !errors.Is(err, repository.ErrAuthAlreadyExists) {
-			t.Fatalf("Execute() = error %v; want %v", err, repository.ErrAuthAlreadyExists)
-		}
-	})
-
-	t.Run("Error saving auth", func(t *testing.T) {
-		t.Parallel()
-
-		dbErr := errors.New("connection refused")
-		repo := &fakeAuthRepository{
-			findErr:   repository.ErrAuthNotFound,
-			createErr: dbErr,
-		}
-		uc := NewCreateAuthUseCase(repo, &fakeHasher{})
-
-		err := uc.Execute(context.Background(), input)
-		if !errors.Is(err, dbErr) {
-			t.Fatalf("Execute() = error %v; want it to wrap %v", err, dbErr)
-		}
-	})
-
-	t.Run("Error hashing password", func(t *testing.T) {
-		t.Parallel()
-
-		hashErr := errors.New("bcrypt: cost out of range")
-		repo := &fakeAuthRepository{findErr: repository.ErrAuthNotFound}
-		uc := NewCreateAuthUseCase(repo, &fakeHasher{err: hashErr})
-
-		err := uc.Execute(context.Background(), input)
-		if !errors.Is(err, hashErr) {
-			t.Fatalf("Execute() = error %v; want it to wrap %v", err, hashErr)
-		}
-		if repo.createCalled {
-			t.Error("CreateAuth() called, want it skipped when hashing fails")
+		if got.UserID != fakeUserID {
+			t.Errorf("user_id = %q, want %q (the ID from the users service)", got.UserID, fakeUserID)
 		}
 	})
 
 	t.Run("Error invalid input", func(t *testing.T) {
 		t.Parallel()
 
-		repo := &fakeAuthRepository{findErr: repository.ErrAuthNotFound}
-		uc := NewCreateAuthUseCase(repo, &fakeHasher{})
-
-		invalid := AuthData{
-			Email:        "teste.teste.com",
-			PasswordHash: input.PasswordHash,
-			UserID:       "abc",
+		tests := []struct {
+			name     string
+			email    string
+			password string
+			wantErr  []error
+		}{
+			{name: "invalid email", email: "teste.teste.com", password: input.Password, wantErr: []error{entity.ErrInvalidEmail}},
+			{name: "invalid password", email: input.Email, password: "123", wantErr: []error{entity.ErrInvalidPassword}},
+			{name: "both invalid", email: "teste.teste.com", password: "123", wantErr: []error{entity.ErrInvalidEmail, entity.ErrInvalidPassword}},
 		}
 
-		err := uc.Execute(context.Background(), invalid)
-		if !errors.Is(err, entity.ErrInvalidEmail) {
-			t.Errorf("Execute() = error %v; want it to include %v", err, entity.ErrInvalidEmail)
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+
+				repo, hs, us := deps()
+				data := AuthData{Name: input.Name, Email: tt.email, Password: tt.password}
+
+				err := NewCreateAuthUseCase(repo, hs, us).Execute(context.Background(), data)
+				for _, want := range tt.wantErr {
+					if !errors.Is(err, want) {
+						t.Errorf("Execute() = error %v; want it to include %v", err, want)
+					}
+				}
+				if repo.findCalled {
+					t.Error("FindByEmail() called, want input validated before touching the database")
+				}
+				if us.createCalled {
+					t.Error("CreateUser() called, want it skipped on invalid input")
+				}
+			})
 		}
-		if !errors.Is(err, entity.ErrInvalidUserID) {
-			t.Errorf("Execute() = error %v; want it to include %v", err, entity.ErrInvalidUserID)
+	})
+
+	t.Run("Error email already exists", func(t *testing.T) {
+		t.Parallel()
+
+		repo, hs, us := deps()
+		repo.findErr = nil
+
+		err := NewCreateAuthUseCase(repo, hs, us).Execute(context.Background(), input)
+		if !errors.Is(err, repository.ErrAuthAlreadyExists) {
+			t.Fatalf("Execute() = error %v; want %v", err, repository.ErrAuthAlreadyExists)
 		}
-		if repo.findCalled {
-			t.Error("FindByEmail() called, want input validated before touching the database")
+		if us.createCalled {
+			t.Error("CreateUser() called, want no user created for a taken email")
+		}
+	})
+
+	t.Run("Error finding email is not treated as free email", func(t *testing.T) {
+		t.Parallel()
+
+		repo, hs, us := deps()
+		dbErr := errors.New("connection refused")
+		repo.findErr = dbErr
+
+		err := NewCreateAuthUseCase(repo, hs, us).Execute(context.Background(), input)
+		if !errors.Is(err, dbErr) {
+			t.Fatalf("Execute() = error %v; want it to wrap %v", err, dbErr)
+		}
+		if errors.Is(err, repository.ErrAuthAlreadyExists) {
+			t.Errorf("Execute() = %v; want an error other than already exists", err)
+		}
+		if us.createCalled {
+			t.Error("CreateUser() called, want it skipped when FindByEmail fails")
+		}
+	})
+
+	t.Run("Error hashing password", func(t *testing.T) {
+		t.Parallel()
+
+		repo, hs, us := deps()
+		hashErr := errors.New("bcrypt: cost out of range")
+		hs.err = hashErr
+
+		err := NewCreateAuthUseCase(repo, hs, us).Execute(context.Background(), input)
+		if !errors.Is(err, hashErr) {
+			t.Fatalf("Execute() = error %v; want it to wrap %v", err, hashErr)
+		}
+		if us.createCalled {
+			t.Error("CreateUser() called, want hashing done before creating the user")
+		}
+	})
+
+	t.Run("Error creating user", func(t *testing.T) {
+		t.Parallel()
+
+		repo, hs, us := deps()
+		usersErr := errors.New("users: unavailable")
+		us.createErr = usersErr
+
+		err := NewCreateAuthUseCase(repo, hs, us).Execute(context.Background(), input)
+		if !errors.Is(err, usersErr) {
+			t.Fatalf("Execute() = error %v; want it to wrap %v", err, usersErr)
 		}
 		if repo.createCalled {
-			t.Error("CreateAuth() called, want it skipped on invalid input")
+			t.Error("CreateAuth() called, want it skipped when CreateUser fails")
+		}
+		if us.deleteCalled {
+			t.Error("DeleteUser() called, want no compensation when no user was created")
+		}
+	})
+
+	t.Run("Compensates when users returns an invalid ID", func(t *testing.T) {
+		t.Parallel()
+
+		repo, hs, us := deps()
+		us.userID = "abc"
+
+		err := NewCreateAuthUseCase(repo, hs, us).Execute(context.Background(), input)
+		if !errors.Is(err, entity.ErrInvalidUserID) {
+			t.Fatalf("Execute() = error %v; want it to include %v", err, entity.ErrInvalidUserID)
+		}
+		if repo.createCalled {
+			t.Error("CreateAuth() called, want it skipped with an invalid user ID")
+		}
+		if us.deletedUserID != "abc" {
+			t.Errorf("DeleteUser() user_id = %q, want %q", us.deletedUserID, "abc")
+		}
+	})
+
+	t.Run("Compensates when saving fails", func(t *testing.T) {
+		t.Parallel()
+
+		tests := []struct {
+			name      string
+			createErr error
+		}{
+			{name: "database error", createErr: errors.New("connection refused")},
+			{name: "email taken between check and save", createErr: repository.ErrAuthAlreadyExists},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+
+				repo, hs, us := deps()
+				repo.createErr = tt.createErr
+
+				err := NewCreateAuthUseCase(repo, hs, us).Execute(context.Background(), input)
+				if !errors.Is(err, tt.createErr) {
+					t.Fatalf("Execute() = error %v; want it to wrap %v", err, tt.createErr)
+				}
+				if us.deletedUserID != fakeUserID {
+					t.Errorf("DeleteUser() user_id = %q, want %q", us.deletedUserID, fakeUserID)
+				}
+			})
+		}
+	})
+
+	t.Run("Compensation failure keeps both errors", func(t *testing.T) {
+		t.Parallel()
+
+		repo, hs, us := deps()
+		saveErr := errors.New("connection refused")
+		deleteErr := errors.New("users: unavailable")
+		repo.createErr = saveErr
+		us.deleteErr = deleteErr
+
+		err := NewCreateAuthUseCase(repo, hs, us).Execute(context.Background(), input)
+		if !errors.Is(err, saveErr) {
+			t.Errorf("Execute() = error %v; want it to wrap the save error %v", err, saveErr)
+		}
+		if !errors.Is(err, deleteErr) {
+			t.Errorf("Execute() = error %v; want it to wrap the compensation error %v", err, deleteErr)
 		}
 	})
 }
