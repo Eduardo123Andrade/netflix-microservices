@@ -36,12 +36,25 @@ func (f *fakeAuthRepository) CreateAuth(ctx context.Context, data entity.Auth) e
 	return f.createErr
 }
 
+// fakeHasher substitui o bcrypt: é instantâneo e devolve um "hash"
+// previsível, para o teste conferir o que foi gravado.
+type fakeHasher struct {
+	err error
+}
+
+func (f *fakeHasher) Hash(pass string) (string, error) {
+	if f.err != nil {
+		return "", f.err
+	}
+	return "hashed:" + pass, nil
+}
+
 func TestCreateAuthUseCase(t *testing.T) {
 	t.Parallel()
 
 	input := AuthData{
 		Email:        "teste@teste.com",
-		PasswordHash: "$2a$10$fakehash",
+		PasswordHash: "Senha@123",
 		UserID:       "01a11ce9-8e01-736d-9c09-a76d396bbc2f",
 	}
 
@@ -49,7 +62,7 @@ func TestCreateAuthUseCase(t *testing.T) {
 		t.Parallel()
 
 		repo := &fakeAuthRepository{findErr: repository.ErrAuthNotFound}
-		uc := NewCreateAuthUseCase(repo)
+		uc := NewCreateAuthUseCase(repo, &fakeHasher{})
 
 		err := uc.Execute(context.Background(), input)
 		if err != nil {
@@ -70,8 +83,8 @@ func TestCreateAuthUseCase(t *testing.T) {
 		if got.Email != input.Email {
 			t.Errorf("email = %q, want %q", got.Email, input.Email)
 		}
-		if got.PasswordHash != input.PasswordHash {
-			t.Errorf("password_hash = %q, want %q", got.PasswordHash, input.PasswordHash)
+		if want := "hashed:" + input.PasswordHash; got.PasswordHash != want {
+			t.Errorf("password_hash = %q, want %q (the plain password must be hashed)", got.PasswordHash, want)
 		}
 		if got.UserID != input.UserID {
 			t.Errorf("user_id = %q, want %q", got.UserID, input.UserID)
@@ -82,7 +95,7 @@ func TestCreateAuthUseCase(t *testing.T) {
 		t.Parallel()
 
 		repo := &fakeAuthRepository{findErr: nil}
-		uc := NewCreateAuthUseCase(repo)
+		uc := NewCreateAuthUseCase(repo, &fakeHasher{})
 
 		err := uc.Execute(context.Background(), input)
 		if !errors.Is(err, repository.ErrAuthAlreadyExists) {
@@ -98,7 +111,7 @@ func TestCreateAuthUseCase(t *testing.T) {
 
 		dbErr := errors.New("connection refused")
 		repo := &fakeAuthRepository{findErr: dbErr}
-		uc := NewCreateAuthUseCase(repo)
+		uc := NewCreateAuthUseCase(repo, &fakeHasher{})
 
 		err := uc.Execute(context.Background(), input)
 		if !errors.Is(err, dbErr) {
@@ -119,7 +132,7 @@ func TestCreateAuthUseCase(t *testing.T) {
 			findErr:   repository.ErrAuthNotFound,
 			createErr: repository.ErrAuthAlreadyExists,
 		}
-		uc := NewCreateAuthUseCase(repo)
+		uc := NewCreateAuthUseCase(repo, &fakeHasher{})
 
 		err := uc.Execute(context.Background(), input)
 		if !errors.Is(err, repository.ErrAuthAlreadyExists) {
@@ -135,7 +148,7 @@ func TestCreateAuthUseCase(t *testing.T) {
 			findErr:   repository.ErrAuthNotFound,
 			createErr: dbErr,
 		}
-		uc := NewCreateAuthUseCase(repo)
+		uc := NewCreateAuthUseCase(repo, &fakeHasher{})
 
 		err := uc.Execute(context.Background(), input)
 		if !errors.Is(err, dbErr) {
@@ -143,11 +156,27 @@ func TestCreateAuthUseCase(t *testing.T) {
 		}
 	})
 
+	t.Run("Error hashing password", func(t *testing.T) {
+		t.Parallel()
+
+		hashErr := errors.New("bcrypt: cost out of range")
+		repo := &fakeAuthRepository{findErr: repository.ErrAuthNotFound}
+		uc := NewCreateAuthUseCase(repo, &fakeHasher{err: hashErr})
+
+		err := uc.Execute(context.Background(), input)
+		if !errors.Is(err, hashErr) {
+			t.Fatalf("Execute() = error %v; want it to wrap %v", err, hashErr)
+		}
+		if repo.createCalled {
+			t.Error("CreateAuth() called, want it skipped when hashing fails")
+		}
+	})
+
 	t.Run("Error invalid input", func(t *testing.T) {
 		t.Parallel()
 
 		repo := &fakeAuthRepository{findErr: repository.ErrAuthNotFound}
-		uc := NewCreateAuthUseCase(repo)
+		uc := NewCreateAuthUseCase(repo, &fakeHasher{})
 
 		invalid := AuthData{
 			Email:        "teste.teste.com",

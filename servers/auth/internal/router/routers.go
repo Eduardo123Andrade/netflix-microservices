@@ -7,7 +7,8 @@ import (
 )
 
 type Deps struct {
-	DB *pgxpool.Pool
+	DB   *pgxpool.Pool
+	Cost int
 }
 
 func New(deps Deps) http.Handler {

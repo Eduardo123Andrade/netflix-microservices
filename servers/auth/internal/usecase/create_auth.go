@@ -13,16 +13,21 @@ type authRepository interface {
 	FindByEmail(ctx context.Context, email string) (entity.Auth, error)
 }
 
+type hashService interface {
+	Hash(pass string) (string, error)
+}
+
 type AuthData struct {
 	Email, PasswordHash, UserID string
 }
 
 type AuthUseCase struct {
 	repo authRepository
+	hs   hashService
 }
 
-func NewCreateAuthUseCase(repo authRepository) *AuthUseCase {
-	return &AuthUseCase{repo: repo}
+func NewCreateAuthUseCase(repo authRepository, hs hashService) *AuthUseCase {
+	return &AuthUseCase{repo: repo, hs: hs}
 }
 
 func (a *AuthUseCase) Execute(ctx context.Context, data AuthData) error {
@@ -31,6 +36,14 @@ func (a *AuthUseCase) Execute(ctx context.Context, data AuthData) error {
 	if err != nil {
 		return fmt.Errorf("create auth: %w", err)
 	}
+
+	passwordHash, err := a.hs.Hash(authEntity.PasswordHash)
+
+	if err != nil {
+		return fmt.Errorf("hash password: %w", err)
+	}
+
+	authEntity.PasswordHash = passwordHash
 
 	_, err = a.repo.FindByEmail(ctx, data.Email)
 

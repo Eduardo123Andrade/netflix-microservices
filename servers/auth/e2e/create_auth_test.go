@@ -30,7 +30,8 @@ func TestCreateAuthEndpoint(t *testing.T) {
 	}
 	t.Cleanup(pool.Close)
 
-	srv := httptest.NewServer(router.New(router.Deps{DB: pool}))
+	// Custo mínimo do bcrypt: o teste fica rápido.
+	srv := httptest.NewServer(router.New(router.Deps{DB: pool, Cost: 4}))
 	t.Cleanup(srv.Close)
 
 	url := srv.URL + createAuthPath
