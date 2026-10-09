@@ -56,6 +56,11 @@ func (r *Reader) IntRange(name string, min, max int) int {
 	return v
 }
 
+func (r *Reader) Int(name string) int {
+	value, _ := r.parseInt(name)
+	return value
+}
+
 func (r *Reader) parseInt(name string) (int, bool) {
 	value, ok := r.lookup(name)
 	if !ok {

@@ -12,6 +12,7 @@ type Database struct {
 type Config struct {
 	Port int
 	DB   Database
+	Cost int
 }
 
 func Load() (Config, error) {
@@ -26,6 +27,8 @@ func Load() (Config, error) {
 			Port:     r.IntRange("DB_PORT", 1, 65535),
 			Host:     r.String("DB_HOST"),
 		},
+
+		Cost: r.IntRange("HASH_COST", 4, 10),
 	}
 
 	if err := r.Err(); err != nil {

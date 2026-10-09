@@ -86,3 +86,43 @@ func TestIntRange(t *testing.T) {
 		})
 	}
 }
+
+func TestInt(t *testing.T) {
+	tests := []struct {
+		name     string
+		envName  string
+		envValue string
+		unset    bool
+		want     int
+		wantErr  error
+	}{
+		{name: "positive value", envName: "KEY_INT_1", envValue: "500", want: 500},
+		{name: "negative value", envName: "KEY_INT_2", envValue: "-5", want: -5},
+		{name: "zero", envName: "KEY_INT_3", envValue: "0", want: 0},
+		{name: "value with space around", envName: "KEY_INT_4", envValue: " 80 ", want: 80},
+		{name: "value is text", envName: "KEY_INT_5", envValue: "ABC", want: 0, wantErr: ErrNotInteger},
+		{name: "value is float", envName: "KEY_INT_6", envValue: "12.4", want: 0, wantErr: ErrNotInteger},
+		{name: "value start with a integer", envName: "KEY_INT_7", envValue: "12abc", want: 0, wantErr: ErrNotInteger},
+		{name: "value is empty", envName: "KEY_INT_8", envValue: "", want: 0, wantErr: ErrEmpty},
+		{name: "key doesnt exists", envName: "AUTH_TEST_NEVER_SET", unset: true, want: 0, wantErr: ErrRequired},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if !tt.unset {
+				t.Setenv(tt.envName, tt.envValue)
+			}
+
+			r := Reader{}
+			got := r.Int(tt.envName)
+
+			if got != tt.want {
+				t.Errorf("Int(%q) = %d; want %d", tt.envValue, got, tt.want)
+			}
+
+			if err := r.Err(); !errors.Is(err, tt.wantErr) {
+				t.Errorf("Int(%q) error = %v; want %v", tt.envName, err, tt.wantErr)
+			}
+		})
+	}
+}

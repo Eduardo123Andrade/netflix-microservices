@@ -19,6 +19,7 @@ var expect = Config{
 		Port:     5450,
 		Host:     "127.0.0.1",
 	},
+	Cost: 4,
 }
 
 func initEnv(t *testing.T) {
@@ -29,6 +30,7 @@ func initEnv(t *testing.T) {
 	t.Setenv("DB_NAME", expect.DB.Name)
 	t.Setenv("DB_PORT", strconv.Itoa(expect.DB.Port))
 	t.Setenv("DB_HOST", expect.DB.Host)
+	t.Setenv("HASH_COST", strconv.Itoa(expect.Cost))
 }
 
 func TestLoad(t *testing.T) {
@@ -56,6 +58,11 @@ func TestLoadInvalidEnv(t *testing.T) {
 		{name: "PORT out of range", envName: "PORT", envValue: "0", wantErr: env.ErrOutOfRange},
 		{name: "DB_HOST ausente", envName: "DB_HOST", unset: true, wantErr: env.ErrRequired},
 		{name: "DB_PORT empty", envName: "DB_PORT", envValue: "", wantErr: env.ErrEmpty},
+		{name: "HASH_COST ausente", envName: "HASH_COST", unset: true, wantErr: env.ErrRequired},
+		{name: "HASH_COST not integer", envName: "HASH_COST", envValue: "dez", wantErr: env.ErrNotInteger},
+		// O bcrypt troca custo < 4 pelo padrão em silêncio; a config precisa recusar.
+		{name: "HASH_COST below bcrypt minimum", envName: "HASH_COST", envValue: "3", wantErr: env.ErrOutOfRange},
+		{name: "HASH_COST above max", envName: "HASH_COST", envValue: "11", wantErr: env.ErrOutOfRange},
 	}
 
 	for _, tt := range tests {
