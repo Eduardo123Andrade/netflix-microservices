@@ -4,6 +4,7 @@ package repository
 
 import (
 	"auth/internal/database"
+	"auth/internal/entity"
 	"auth/internal/testutil"
 	"context"
 	"errors"
@@ -29,7 +30,7 @@ func newTestPool(t *testing.T) *pgxpool.Pool {
 	return pool
 }
 
-func insertAuth(t *testing.T, pool *pgxpool.Pool, data AuthData) {
+func insertAuth(t *testing.T, pool *pgxpool.Pool, data entity.Auth) {
 	t.Helper()
 
 	_, err := pool.Exec(context.Background(),
@@ -49,7 +50,7 @@ func TestCreateAuth(t *testing.T) {
 		ctx := context.Background()
 		a := NewAuthRepository(pool)
 
-		expect := AuthData{
+		expect := entity.Auth{
 			ID:           "01a11c10-8e01-736d-9c09-a76d396bbc2f",
 			Email:        "teste@teste.com",
 			PasswordHash: "$2a$10$fakehash",
@@ -102,7 +103,7 @@ func TestCreateAuth(t *testing.T) {
 		a := NewAuthRepository(pool)
 		ctx := context.Background()
 
-		expect := AuthData{
+		expect := entity.Auth{
 			ID:           "01a11c11-8e01-736d-9c09-a76d396bbc2f",
 			Email:        "teste2@teste.com",
 			PasswordHash: "$2a$10$fakehash",
@@ -135,7 +136,7 @@ func TestCreateAuth(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 
-		err := a.CreateAuth(ctx, AuthData{
+		err := a.CreateAuth(ctx, entity.Auth{
 			ID:           "01a11c12-8e01-736d-9c09-a76d396bbc2f",
 			Email:        "teste3@teste.com",
 			PasswordHash: "$2a$10$fakehash",
@@ -161,7 +162,7 @@ func TestFindByEmail(t *testing.T) {
 		ctx := context.Background()
 		a := NewAuthRepository(pool)
 
-		want := AuthData{
+		want := entity.Auth{
 			ID:           "01a11d10-8e01-736d-9c09-a76d396bbc2f",
 			Email:        "find1@teste.com",
 			PasswordHash: "$2a$10$fakehash",
@@ -192,13 +193,13 @@ func TestFindByEmail(t *testing.T) {
 		ctx := context.Background()
 		a := NewAuthRepository(pool)
 
-		first := AuthData{
+		first := entity.Auth{
 			ID:           "01a11d11-8e01-736d-9c09-a76d396bbc2f",
 			Email:        "find2a@teste.com",
 			PasswordHash: "$2a$10$fakehash",
 			UserID:       "01a11de9-8e01-736d-9c09-a76d396bbc2f",
 		}
-		second := AuthData{
+		second := entity.Auth{
 			ID:           "01a11d12-8e01-736d-9c09-a76d396bbc2f",
 			Email:        "find2b@teste.com",
 			PasswordHash: "$2a$10$fakehash",
@@ -248,7 +249,7 @@ func TestFindByEmail(t *testing.T) {
 		ctx := context.Background()
 		a := NewAuthRepository(pool)
 
-		insertAuth(t, pool, AuthData{
+		insertAuth(t, pool, entity.Auth{
 			ID:           "01a11d15-8e01-736d-9c09-a76d396bbc2f",
 			Email:        "find5@teste.com",
 			PasswordHash: "$2a$10$fakehash",

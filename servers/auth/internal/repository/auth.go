@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"auth/internal/entity"
 	"context"
 	"errors"
 
@@ -14,13 +15,6 @@ type AuthRepository struct {
 	pool *pgxpool.Pool
 }
 
-type AuthData struct {
-	ID           string
-	Email        string
-	PasswordHash string
-	UserID       string
-}
-
 var (
 	ErrAuthAlreadyExists = errors.New("duplicated data")
 	ErrAuthNotFound      = errors.New("authentication not found")
@@ -30,7 +24,7 @@ func NewAuthRepository(pool *pgxpool.Pool) *AuthRepository {
 	return &AuthRepository{pool: pool}
 }
 
-func (ar *AuthRepository) CreateAuth(ctx context.Context, data AuthData) error {
+func (ar *AuthRepository) CreateAuth(ctx context.Context, data entity.Auth) error {
 	var pgError *pgconn.PgError
 
 	_, err := ar.pool.Exec(ctx,
@@ -50,7 +44,7 @@ func (ar *AuthRepository) CreateAuth(ctx context.Context, data AuthData) error {
 	return err
 }
 
-func (ar *AuthRepository) FindByEmail(ctx context.Context, email string) (AuthData, error) {
+func (ar *AuthRepository) FindByEmail(ctx context.Context, email string) (entity.Auth, error) {
 	var (
 		gotID           string
 		gotEmail        string
@@ -66,12 +60,12 @@ func (ar *AuthRepository) FindByEmail(ctx context.Context, email string) (AuthDa
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return AuthData{}, ErrAuthNotFound
+			return entity.Auth{}, ErrAuthNotFound
 		}
-		return AuthData{}, err
+		return entity.Auth{}, err
 	}
 
-	return AuthData{
+	return entity.Auth{
 		ID:           gotID,
 		Email:        gotEmail,
 		PasswordHash: gotPasswordHash,
