@@ -15,12 +15,14 @@ type fakeAuthRepository struct {
 	findErr   error
 	createErr error
 
+	findCalled    bool
 	findEmail     string
 	createCalled  bool
 	createdEntity entity.Auth
 }
 
 func (f *fakeAuthRepository) FindByEmail(ctx context.Context, email string) (entity.Auth, error) {
+	f.findCalled = true
 	f.findEmail = email
 	if f.findErr != nil {
 		return entity.Auth{}, f.findErr
@@ -138,6 +140,33 @@ func TestCreateAuthUseCase(t *testing.T) {
 		err := uc.Execute(context.Background(), input)
 		if !errors.Is(err, dbErr) {
 			t.Fatalf("Execute() = error %v; want it to wrap %v", err, dbErr)
+		}
+	})
+
+	t.Run("Error invalid input", func(t *testing.T) {
+		t.Parallel()
+
+		repo := &fakeAuthRepository{findErr: repository.ErrAuthNotFound}
+		uc := NewAuthUseCase(repo)
+
+		invalid := AuthData{
+			Email:        "teste.teste.com",
+			PasswordHash: input.PasswordHash,
+			UserID:       "abc",
+		}
+
+		err := uc.Execute(context.Background(), invalid)
+		if !errors.Is(err, entity.ErrInvalidEmail) {
+			t.Errorf("Execute() = error %v; want it to include %v", err, entity.ErrInvalidEmail)
+		}
+		if !errors.Is(err, entity.ErrInvalidUserID) {
+			t.Errorf("Execute() = error %v; want it to include %v", err, entity.ErrInvalidUserID)
+		}
+		if repo.findCalled {
+			t.Error("FindByEmail() called, want input validated before touching the database")
+		}
+		if repo.createCalled {
+			t.Error("CreateAuth() called, want it skipped on invalid input")
 		}
 	})
 }

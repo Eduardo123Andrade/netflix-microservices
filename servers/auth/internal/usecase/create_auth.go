@@ -26,18 +26,19 @@ func NewAuthUseCase(repo authRepository) *AuthUseCase {
 }
 
 func (a *AuthUseCase) Execute(ctx context.Context, data AuthData) error {
-	_, err := a.repo.FindByEmail(ctx, data.Email)
+	authEntity, err := entity.NewAuth(data.Email, data.PasswordHash, data.UserID)
+
+	if err != nil {
+		return fmt.Errorf("create auth: %w", err)
+	}
+
+	_, err = a.repo.FindByEmail(ctx, data.Email)
+
 	switch {
 	case err == nil:
 		return repository.ErrAuthAlreadyExists
 	case !errors.Is(err, repository.ErrAuthNotFound):
 		return fmt.Errorf("create auth: find by email: %w", err)
-	}
-
-	authEntity, err := entity.NewAuth(data.Email, data.PasswordHash, data.UserID)
-
-	if err != nil {
-		return fmt.Errorf("create auth: %w", err)
 	}
 
 	if err := a.repo.CreateAuth(ctx, authEntity); err != nil {
