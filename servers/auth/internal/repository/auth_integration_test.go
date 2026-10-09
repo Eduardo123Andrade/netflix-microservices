@@ -29,6 +29,18 @@ func newTestPool(t *testing.T) *pgxpool.Pool {
 	return pool
 }
 
+func insertAuth(t *testing.T, pool *pgxpool.Pool, data AuthData) {
+	t.Helper()
+
+	_, err := pool.Exec(context.Background(),
+		"INSERT INTO auth (id, email, password_hash, user_id) VALUES ($1, $2, $3, $4)",
+		data.ID, data.Email, data.PasswordHash, data.UserID,
+	)
+	if err != nil {
+		t.Fatalf("insertAuth(%s) unexpected error: %v", data.Email, err)
+	}
+}
+
 func TestCreateAuth(t *testing.T) {
 	t.Parallel()
 	pool := newTestPool(t)
@@ -138,6 +150,114 @@ func TestCreateAuth(t *testing.T) {
 		}
 		if !errors.Is(err, context.Canceled) {
 			t.Errorf("CreateAuth() = %v; want it to wrap context.Canceled", err)
+		}
+	})
+}
+func TestFindByEmail(t *testing.T) {
+	t.Parallel()
+	pool := newTestPool(t)
+
+	t.Run("Find auth", func(t *testing.T) {
+		ctx := context.Background()
+		a := NewAuthRepository(pool)
+
+		want := AuthData{
+			ID:           "01a11d10-8e01-736d-9c09-a76d396bbc2f",
+			Email:        "find1@teste.com",
+			PasswordHash: "$2a$10$fakehash",
+			UserID:       "01a11de9-8e01-736d-9c09-a76d396bbc2f",
+		}
+		insertAuth(t, pool, want)
+
+		got, err := a.FindByEmail(ctx, want.Email)
+		if err != nil {
+			t.Fatalf("FindByEmail() unexpected error: %v", err)
+		}
+
+		if got.ID != want.ID {
+			t.Errorf("id = %q, want %q", got.ID, want.ID)
+		}
+		if got.UserID != want.UserID {
+			t.Errorf("user_id = %q, want %q", got.UserID, want.UserID)
+		}
+		if got.Email != want.Email {
+			t.Errorf("email = %q, want %q", got.Email, want.Email)
+		}
+		if got.PasswordHash != want.PasswordHash {
+			t.Errorf("password_hash = %q, want %q", got.PasswordHash, want.PasswordHash)
+		}
+	})
+
+	t.Run("Find the right auth among many", func(t *testing.T) {
+		ctx := context.Background()
+		a := NewAuthRepository(pool)
+
+		first := AuthData{
+			ID:           "01a11d11-8e01-736d-9c09-a76d396bbc2f",
+			Email:        "find2a@teste.com",
+			PasswordHash: "$2a$10$fakehash",
+			UserID:       "01a11de9-8e01-736d-9c09-a76d396bbc2f",
+		}
+		second := AuthData{
+			ID:           "01a11d12-8e01-736d-9c09-a76d396bbc2f",
+			Email:        "find2b@teste.com",
+			PasswordHash: "$2a$10$fakehash",
+			UserID:       "01a11de9-8e01-736d-9c09-a76d396bbc2f",
+		}
+		insertAuth(t, pool, first)
+		insertAuth(t, pool, second)
+
+		got, err := a.FindByEmail(ctx, second.Email)
+		if err != nil {
+			t.Fatalf("FindByEmail() unexpected error: %v", err)
+		}
+		if got.ID != second.ID {
+			t.Errorf("id = %q, want %q", got.ID, second.ID)
+		}
+	})
+
+	t.Run("Error not found", func(t *testing.T) {
+		a := NewAuthRepository(pool)
+
+		_, err := a.FindByEmail(context.Background(), "naoexiste@teste.com")
+
+		if !errors.Is(err, ErrAuthNotFound) {
+			t.Fatalf("FindByEmail() = error %v; want %v", err, ErrAuthNotFound)
+		}
+	})
+
+	t.Run("Error context canceled", func(t *testing.T) {
+		a := NewAuthRepository(pool)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		_, err := a.FindByEmail(ctx, "find4@teste.com")
+		if err == nil {
+			t.Fatal("FindByEmail() = error nil; want error")
+		}
+		if errors.Is(err, ErrAuthNotFound) {
+			t.Fatalf("FindByEmail() = %v; want an error other than not found", err)
+		}
+		if !errors.Is(err, context.Canceled) {
+			t.Errorf("FindByEmail() = %v; want it to wrap context.Canceled", err)
+		}
+	})
+
+	t.Run("Search is exact", func(t *testing.T) {
+		ctx := context.Background()
+		a := NewAuthRepository(pool)
+
+		insertAuth(t, pool, AuthData{
+			ID:           "01a11d15-8e01-736d-9c09-a76d396bbc2f",
+			Email:        "find5@teste.com",
+			PasswordHash: "$2a$10$fakehash",
+			UserID:       "01a11de9-8e01-736d-9c09-a76d396bbc2f",
+		})
+
+		_, err := a.FindByEmail(ctx, "FIND5@teste.com")
+		if !errors.Is(err, ErrAuthNotFound) {
+			t.Fatalf("FindByEmail() = error %v; want %v (repository does not normalize)", err, ErrAuthNotFound)
 		}
 	})
 }
