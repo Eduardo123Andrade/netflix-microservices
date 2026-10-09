@@ -14,6 +14,7 @@ func New(deps Deps) http.Handler {
 	api := http.NewServeMux()
 
 	registerHealth(api, deps)
+	RegisterAuth(api, deps)
 
 	return api
 }

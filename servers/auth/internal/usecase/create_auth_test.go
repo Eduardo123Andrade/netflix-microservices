@@ -49,7 +49,7 @@ func TestCreateAuthUseCase(t *testing.T) {
 		t.Parallel()
 
 		repo := &fakeAuthRepository{findErr: repository.ErrAuthNotFound}
-		uc := NewAuthUseCase(repo)
+		uc := NewCreateAuthUseCase(repo)
 
 		err := uc.Execute(context.Background(), input)
 		if err != nil {
@@ -82,7 +82,7 @@ func TestCreateAuthUseCase(t *testing.T) {
 		t.Parallel()
 
 		repo := &fakeAuthRepository{findErr: nil}
-		uc := NewAuthUseCase(repo)
+		uc := NewCreateAuthUseCase(repo)
 
 		err := uc.Execute(context.Background(), input)
 		if !errors.Is(err, repository.ErrAuthAlreadyExists) {
@@ -98,7 +98,7 @@ func TestCreateAuthUseCase(t *testing.T) {
 
 		dbErr := errors.New("connection refused")
 		repo := &fakeAuthRepository{findErr: dbErr}
-		uc := NewAuthUseCase(repo)
+		uc := NewCreateAuthUseCase(repo)
 
 		err := uc.Execute(context.Background(), input)
 		if !errors.Is(err, dbErr) {
@@ -119,7 +119,7 @@ func TestCreateAuthUseCase(t *testing.T) {
 			findErr:   repository.ErrAuthNotFound,
 			createErr: repository.ErrAuthAlreadyExists,
 		}
-		uc := NewAuthUseCase(repo)
+		uc := NewCreateAuthUseCase(repo)
 
 		err := uc.Execute(context.Background(), input)
 		if !errors.Is(err, repository.ErrAuthAlreadyExists) {
@@ -135,7 +135,7 @@ func TestCreateAuthUseCase(t *testing.T) {
 			findErr:   repository.ErrAuthNotFound,
 			createErr: dbErr,
 		}
-		uc := NewAuthUseCase(repo)
+		uc := NewCreateAuthUseCase(repo)
 
 		err := uc.Execute(context.Background(), input)
 		if !errors.Is(err, dbErr) {
@@ -147,7 +147,7 @@ func TestCreateAuthUseCase(t *testing.T) {
 		t.Parallel()
 
 		repo := &fakeAuthRepository{findErr: repository.ErrAuthNotFound}
-		uc := NewAuthUseCase(repo)
+		uc := NewCreateAuthUseCase(repo)
 
 		invalid := AuthData{
 			Email:        "teste.teste.com",

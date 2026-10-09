@@ -21,7 +21,7 @@ type AuthUseCase struct {
 	repo authRepository
 }
 
-func NewAuthUseCase(repo authRepository) *AuthUseCase {
+func NewCreateAuthUseCase(repo authRepository) *AuthUseCase {
 	return &AuthUseCase{repo: repo}
 }
 
