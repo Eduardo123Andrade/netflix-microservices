@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -31,8 +32,13 @@ func TestCreateAuthEndpoint(t *testing.T) {
 	}
 	t.Cleanup(pool.Close)
 
+	// Servidor users falso numa porta TCP real; o auth conecta nele com o
+	// mesmo conector da produção.
+	usersAddr := testutil.StartFakeUsers(t, &testutil.FakeUsersServer{})
+	users := testutil.DialUsers(t, usersAddr)
+
 	// Custo mínimo do bcrypt: o teste fica rápido.
-	srv := httptest.NewServer(router.New(router.Deps{DB: pool, Cost: 4}))
+	srv := httptest.NewServer(router.New(router.Deps{DB: pool, Cost: 4, Users: users}))
 	t.Cleanup(srv.Close)
 
 	url := srv.URL + createAuthPath
@@ -57,12 +63,15 @@ func TestCreateAuthEndpoint(t *testing.T) {
 			t.Fatalf("rows with email = %d; want 1", n)
 		}
 
-		var hash string
+		var hash, userID string
 		err := pool.QueryRow(context.Background(),
-			"SELECT password_hash FROM auth WHERE email = $1", "e2e1@teste.com",
-		).Scan(&hash)
+			"SELECT password_hash, user_id FROM auth WHERE email = $1", "e2e1@teste.com",
+		).Scan(&hash, &userID)
 		if err != nil {
-			t.Fatalf("select password_hash: %v", err)
+			t.Fatalf("select auth: %v", err)
+		}
+		if userID != testutil.FakeUserID {
+			t.Errorf("user_id = %q; want %q (the ID returned by the users service)", userID, testutil.FakeUserID)
 		}
 		if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte("Senha@123")); err != nil {
 			t.Errorf("password_hash = %q; want a bcrypt hash of the password: %v", hash, err)
@@ -145,6 +154,47 @@ func TestCreateAuthEndpoint(t *testing.T) {
 			t.Errorf("status = %d; want %d", resp.StatusCode, http.StatusMethodNotAllowed)
 		}
 	})
+
+	// Usa outro servidor HTTP, apontando para um endereço sem nada escutando
+	// (como o users caído de verdade), sobre o mesmo banco.
+	t.Run("users fora do ar não grava credencial", func(t *testing.T) {
+		t.Parallel()
+
+		down := testutil.DialUsers(t, closedAddr(t))
+		srvDown := httptest.NewServer(router.New(router.Deps{DB: pool, Cost: 4, Users: down}))
+		t.Cleanup(srvDown.Close)
+
+		code, resp := postJSON(t, srvDown.URL+createAuthPath, `{
+			"email": "e2e4@teste.com",
+			"name": "Eduardo",
+			"password": "Senha@123"
+		}`)
+
+		if code != http.StatusInternalServerError {
+			t.Errorf("status = %d; want %d", code, http.StatusInternalServerError)
+		}
+		if got := errorMessage(t, resp); got != "internal error" {
+			t.Errorf("error = %q; want %q", got, "internal error")
+		}
+		if n := countAuthByEmail(t, pool, "e2e4@teste.com"); n != 0 {
+			t.Errorf("rows with email = %d; want 0", n)
+		}
+	})
+}
+
+// closedAddr devolve um endereço local em que nada escuta: abre uma porta
+// livre e fecha em seguida.
+func closedAddr(t *testing.T) string {
+	t.Helper()
+
+	lis, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	addr := lis.Addr().String()
+	lis.Close()
+
+	return addr
 }
 
 func postJSON(t *testing.T, url, body string) (int, string) {

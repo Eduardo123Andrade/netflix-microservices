@@ -12,7 +12,7 @@ func registerCreateAuth(mux *http.ServeMux, d Deps) {
 	r := repository.NewAuthRepository(d.DB)
 
 	hs := services.NewHasher(d.Cost)
-	us := services.NewUserService()
+	us := services.NewUserService(d.Users)
 
 	uc := usecase.NewCreateAuthUseCase(r, hs, us)
 	h := handler.CreateAuth(uc)

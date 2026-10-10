@@ -3,6 +3,8 @@ package main
 import (
 	"auth/internal/config"
 	"auth/internal/database"
+	usersv1 "auth/internal/gen/users/v1"
+	"auth/internal/grpcclient"
 	"auth/internal/router"
 	"context"
 	"fmt"
@@ -35,7 +37,15 @@ func main() {
 		log.Printf("aviso: banco indisponível na subida, seguindo mesmo assim: %v", err)
 	}
 
-	r := router.New(router.Deps{DB: pool, Cost: c.Cost})
+	userConn, err := grpcclient.NewGrpcUserClient(c.UserServerAddr)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer userConn.Close()
+
+	r := router.New(router.Deps{DB: pool, Cost: c.Cost, Users: usersv1.NewUserServiceClient(userConn)})
 
 	p := fmt.Sprintf(":%d", c.Port)
 	listener, err := net.Listen("tcp", p)
