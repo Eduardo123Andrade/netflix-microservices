@@ -6,6 +6,7 @@ const envSchema = z.object({
     .default('development'),
   HOST: z.string().default('0.0.0.0'),
   PORT: z.coerce.number().int().positive().default(8081),
+  GRPC_PORT: z.coerce.number().int().positive().default(50051),
   DATABASE_URL: z.string().min(1),
 })
 
