@@ -1,0 +1,12 @@
+version: v2
+
+inputs:
+  - directory: ../../contracts # qual .proto ler
+
+plugins:
+  - local: ./node_modules/.bin/protoc-gen-ts_proto
+    out: src/generated/grpc
+    opt:
+      - paths=source_relative
+      - outputServices=grpc-js
+      - esModuleInterop=true
