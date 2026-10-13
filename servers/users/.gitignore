@@ -1,0 +1,18 @@
+# Dependências
+node_modules/
+.pnpm-store/
+
+# Build
+dist/
+*.tsbuildinfo
+src/generated/
+
+# Testes
+coverage/
+
+# Os bancos de integration/e2e são efêmeros (tmpfs) e só existem na máquina
+# local; as credenciais deles não são segredo e já estão nos docker-compose.
+# O .env de dev continua fora do git (regra da raiz).
+!.env.test
+!.env.integration
+!.env.e2e
