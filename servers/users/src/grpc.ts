@@ -1,15 +1,10 @@
-import { HealthImplementation, ServingStatusMap } from 'grpc-health-check'
+import { HealthImplementation } from 'grpc-health-check'
 import * as grpc from '@grpc/grpc-js'
 import { env } from '@/config'
 
 export type GrpcServer = {
   port: number
   shutdown: () => Promise<void>
-}
-
-const statusMap: ServingStatusMap = {
-  UserService: 'SERVING',
-  '': 'SERVING',
 }
 
 const bind = (server: grpc.Server, address: string): Promise<number> =>
@@ -32,8 +27,6 @@ export const startGrpcServer = async (): Promise<GrpcServer> => {
   const health = new HealthImplementation({ '': 'SERVING' })
 
   health.addToServer(server)
-
-  health.setStatus('', 'SERVING')
 
   const port = await bind(server, `${env.HOST}:${env.GRPC_PORT}`)
 
