@@ -2,6 +2,9 @@ import { HealthImplementation } from 'grpc-health-check'
 import * as grpc from '@grpc/grpc-js'
 import { env } from '@/config'
 
+import { UserServiceService } from '@/generated/grpc/users/v1/users'
+import { userServiceV1 } from '@/modules/user/handler/v1'
+
 export type GrpcServer = {
   port: number
   shutdown: () => Promise<void>
@@ -27,6 +30,8 @@ export const startGrpcServer = async (): Promise<GrpcServer> => {
   const health = new HealthImplementation({ '': 'SERVING' })
 
   health.addToServer(server)
+
+  server.addService(UserServiceService, userServiceV1)
 
   const port = await bind(server, `${env.HOST}:${env.GRPC_PORT}`)
 
