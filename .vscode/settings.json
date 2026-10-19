@@ -1,7 +1,11 @@
 {
   "gopls": {
-    "buildFlags": ["-tags=integration"]
+    "buildFlags": ["-tags=integration"],
+    "formatting.gofumpt": true
   },
+  "go.lintTool": "golangci-lint",
+  "go.lintOnSave": "package",
+  "go.lintFlags": ["--fix"],
   "[go]": {
     "editor.defaultFormatter": "golang.go",
     "editor.formatOnSave": true,

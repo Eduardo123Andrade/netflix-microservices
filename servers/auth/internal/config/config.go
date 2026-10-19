@@ -9,11 +9,17 @@ type Database struct {
 	Port     int
 	Host     string
 }
+type JWT struct {
+	PrivateKeyPath string
+	TTL            string
+}
+
 type Config struct {
 	Port           int
 	DB             Database
 	Cost           int
 	UserServerAddr string
+	JWT            JWT
 }
 
 func Load() (Config, error) {
@@ -28,9 +34,12 @@ func Load() (Config, error) {
 			Port:     r.IntRange("DB_PORT", 1, 65535),
 			Host:     r.String("DB_HOST"),
 		},
-
 		Cost:           r.IntRange("HASH_COST", 4, 10),
 		UserServerAddr: r.String("USER_SERVER_ADDR"),
+		JWT: JWT{
+			PrivateKeyPath: r.String("JWT_PRIVATE_KEY_PATH"),
+			TTL:            r.String("JWT_TTL"),
+		},
 	}
 
 	if err := r.Err(); err != nil {
