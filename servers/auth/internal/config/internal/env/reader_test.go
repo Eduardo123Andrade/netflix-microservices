@@ -3,6 +3,7 @@ package env
 import (
 	"errors"
 	"testing"
+	"time"
 )
 
 func TestString(t *testing.T) {
@@ -122,6 +123,99 @@ func TestInt(t *testing.T) {
 
 			if err := r.Err(); !errors.Is(err, tt.wantErr) {
 				t.Errorf("Int(%q) error = %v; want %v", tt.envName, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestDuration(t *testing.T) {
+	tests := []struct {
+		name     string
+		envName  string
+		envValue string
+		unset    bool
+		want     time.Duration
+		wantErr  error
+	}{
+		{name: "minutes", envName: "KEY_DUR_1", envValue: "15m", want: 15 * time.Minute},
+		{name: "compound value", envName: "KEY_DUR_2", envValue: "1h30m", want: 90 * time.Minute},
+		{name: "milliseconds", envName: "KEY_DUR_3", envValue: "500ms", want: 500 * time.Millisecond},
+		{name: "negative value", envName: "KEY_DUR_4", envValue: "-5m", want: -5 * time.Minute},
+		{name: "value with space around", envName: "KEY_DUR_5", envValue: " 15m ", want: 15 * time.Minute},
+		// Sem unidade é ambíguo (segundos? minutos?), então o time.ParseDuration recusa.
+		{name: "number without unit", envName: "KEY_DUR_6", envValue: "15", wantErr: ErrNotDuration},
+		{name: "value is text", envName: "KEY_DUR_7", envValue: "15 minutes", wantErr: ErrNotDuration},
+		{name: "value is empty", envName: "KEY_DUR_8", envValue: "", wantErr: ErrEmpty},
+		{name: "key doesnt exists", envName: "AUTH_TEST_NEVER_SET", unset: true, wantErr: ErrRequired},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if !tt.unset {
+				t.Setenv(tt.envName, tt.envValue)
+			}
+
+			r := Reader{}
+			got := r.Duration(tt.envName)
+
+			if got != tt.want {
+				t.Errorf("Duration(%q) = %v; want %v", tt.envValue, got, tt.want)
+			}
+
+			if err := r.Err(); !errors.Is(err, tt.wantErr) {
+				t.Errorf("Duration(%q) error = %v; want %v", tt.envName, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestDurationRange(t *testing.T) {
+	const (
+		min = time.Minute
+		max = 24 * time.Hour
+	)
+
+	tests := []struct {
+		name     string
+		envName  string
+		envValue string
+		unset    bool
+		want     time.Duration
+		wantErr  error
+	}{
+		{name: "value inside range", envName: "KEY_DR_1", envValue: "15m", want: 15 * time.Minute},
+		{name: "value is the minimum value", envName: "KEY_DR_2", envValue: "1m", want: time.Minute},
+		{name: "same minimum in another unit", envName: "KEY_DR_3", envValue: "60s", want: time.Minute},
+		{name: "value is lower than minimum", envName: "KEY_DR_4", envValue: "59s", wantErr: ErrOutOfRange},
+		{name: "value is the maximum value", envName: "KEY_DR_5", envValue: "24h", want: 24 * time.Hour},
+		{name: "value is higher than maximum", envName: "KEY_DR_6", envValue: "24h1s", wantErr: ErrOutOfRange},
+		{name: "zero", envName: "KEY_DR_7", envValue: "0s", wantErr: ErrOutOfRange},
+		{name: "negative value", envName: "KEY_DR_8", envValue: "-5m", wantErr: ErrOutOfRange},
+		{name: "number without unit", envName: "KEY_DR_9", envValue: "15", wantErr: ErrNotDuration},
+		{name: "value is empty", envName: "KEY_DR_10", envValue: "", wantErr: ErrEmpty},
+		{name: "key doesnt exists", envName: "AUTH_TEST_NEVER_SET", unset: true, wantErr: ErrRequired},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if !tt.unset {
+				t.Setenv(tt.envName, tt.envValue)
+			}
+
+			r := Reader{}
+			got := r.DurationRange(tt.envName, min, max)
+
+			if got != tt.want {
+				t.Errorf("DurationRange(%q) = %v; want %v", tt.envValue, got, tt.want)
+			}
+
+			// Um erro só por variável: ausente não pode virar também "não é duração".
+			err := r.Err()
+			if !errors.Is(err, tt.wantErr) {
+				t.Errorf("DurationRange(%q) error = %v; want %v", tt.envName, err, tt.wantErr)
+			}
+			if n := len(r.errs); tt.wantErr != nil && n != 1 {
+				t.Errorf("DurationRange(%q) recorded %d errors; want 1: %v", tt.envName, n, err)
 			}
 		})
 	}

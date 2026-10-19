@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 var expect = Config{
@@ -21,6 +22,10 @@ var expect = Config{
 	},
 	Cost:           4,
 	UserServerAddr: "localhost:50051",
+	JWT: JWT{
+		PrivateKeyPath: "keys/test.pem",
+		TTL:            15 * time.Minute,
+	},
 }
 
 func initEnv(t *testing.T) {
@@ -33,6 +38,8 @@ func initEnv(t *testing.T) {
 	t.Setenv("DB_HOST", expect.DB.Host)
 	t.Setenv("HASH_COST", strconv.Itoa(expect.Cost))
 	t.Setenv("USER_SERVER_ADDR", expect.UserServerAddr)
+	t.Setenv("JWT_PRIVATE_KEY_PATH", expect.JWT.PrivateKeyPath)
+	t.Setenv("JWT_TTL", expect.JWT.TTL.String())
 }
 
 func TestLoad(t *testing.T) {
@@ -67,6 +74,14 @@ func TestLoadInvalidEnv(t *testing.T) {
 		{name: "HASH_COST above max", envName: "HASH_COST", envValue: "11", wantErr: env.ErrOutOfRange},
 		{name: "USER_SERVER_ADDR ausente", envName: "USER_SERVER_ADDR", unset: true, wantErr: env.ErrRequired},
 		{name: "USER_SERVER_ADDR empty", envName: "USER_SERVER_ADDR", envValue: "", wantErr: env.ErrEmpty},
+		{name: "JWT_PRIVATE_KEY_PATH ausente", envName: "JWT_PRIVATE_KEY_PATH", unset: true, wantErr: env.ErrRequired},
+		{name: "JWT_PRIVATE_KEY_PATH empty", envName: "JWT_PRIVATE_KEY_PATH", envValue: "", wantErr: env.ErrEmpty},
+		{name: "JWT_TTL ausente", envName: "JWT_TTL", unset: true, wantErr: env.ErrRequired},
+		{name: "JWT_TTL without unit", envName: "JWT_TTL", envValue: "15", wantErr: env.ErrNotDuration},
+		// Abaixo de 1 minuto o token vence antes de o cliente conseguir usá-lo.
+		{name: "JWT_TTL below minimum", envName: "JWT_TTL", envValue: "30s", wantErr: env.ErrOutOfRange},
+		// Sem revogação, um token vazado vale até vencer; o teto limita o estrago.
+		{name: "JWT_TTL above max", envName: "JWT_TTL", envValue: "25h", wantErr: env.ErrOutOfRange},
 	}
 
 	for _, tt := range tests {

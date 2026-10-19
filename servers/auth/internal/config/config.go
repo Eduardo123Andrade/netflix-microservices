@@ -1,6 +1,10 @@
 package config
 
-import "auth/internal/config/internal/env"
+import (
+	"time"
+
+	"auth/internal/config/internal/env"
+)
 
 type Database struct {
 	User     string
@@ -11,7 +15,7 @@ type Database struct {
 }
 type JWT struct {
 	PrivateKeyPath string
-	TTL            string
+	TTL            time.Duration
 }
 
 type Config struct {
@@ -38,7 +42,7 @@ func Load() (Config, error) {
 		UserServerAddr: r.String("USER_SERVER_ADDR"),
 		JWT: JWT{
 			PrivateKeyPath: r.String("JWT_PRIVATE_KEY_PATH"),
-			TTL:            r.String("JWT_TTL"),
+			TTL:            r.DurationRange("JWT_TTL", time.Minute, 24*time.Hour),
 		},
 	}
 

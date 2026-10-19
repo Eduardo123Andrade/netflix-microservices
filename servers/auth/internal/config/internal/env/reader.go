@@ -14,7 +14,7 @@ var (
 	ErrEmpty       = errors.New("cannot be empty")
 	ErrNotInteger  = errors.New("must be an integer")
 	ErrOutOfRange  = errors.New("out of range")
-	ErrNotDuration = errors.New("invalid duration")
+	ErrNotDuration = errors.New("must be a duration")
 )
 
 type Reader struct {
@@ -90,20 +90,26 @@ func (r *Reader) parseDuration(name string) (time.Duration, bool) {
 		return 0, false
 	}
 
-	if v <= 0 {
-		r.errs = append(r.errs, fmt.Errorf("%s %w, got %q", name, ErrNotDuration, value))
-		return 0, false
-	}
-
 	return v, true
 }
 
 func (r *Reader) Duration(name string) time.Duration {
 	value, _ := r.parseDuration(name)
-
-	v := r.
-
 	return value
+}
+
+func (r *Reader) DurationRange(name string, min, max time.Duration) time.Duration {
+	v, ok := r.parseDuration(name)
+	if !ok {
+		return 0
+	}
+
+	if v < min || v > max {
+		r.errs = append(r.errs, fmt.Errorf("%s %w [%s, %s], got %s", name, ErrOutOfRange, min, max, v))
+		return 0
+	}
+
+	return v
 }
 
 func (r *Reader) Err() error {
