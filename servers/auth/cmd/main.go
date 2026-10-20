@@ -30,12 +30,15 @@ func main() {
 	}
 	defer closeConns()
 
-	r := router.New(router.Deps{
+	r, err := router.New(router.Deps{
 		DB:     conns.db,
 		Cost:   c.Cost,
 		Users:  usersv1.NewUserServiceClient(conns.users),
 		Tokens: tokens,
 	})
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	p := fmt.Sprintf(":%d", c.Port)
 	listener, err := net.Listen("tcp", p)

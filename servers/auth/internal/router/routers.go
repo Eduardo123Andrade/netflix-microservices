@@ -15,11 +15,13 @@ type Deps struct {
 	Tokens *services.TokenService
 }
 
-func New(deps Deps) http.Handler {
+func New(deps Deps) (http.Handler, error) {
 	api := http.NewServeMux()
 
 	registerHealth(api, deps)
-	RegisterAuth(api, deps)
+	if err := RegisterAuth(api, deps); err != nil {
+		return nil, err
+	}
 
-	return api
+	return api, nil
 }
