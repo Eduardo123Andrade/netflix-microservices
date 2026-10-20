@@ -142,6 +142,50 @@ func TestCreateAuthUseCase(t *testing.T) {
 		}
 	})
 
+	t.Run("Normalizes email before using it", func(t *testing.T) {
+		t.Parallel()
+
+		repo, hs, us := deps()
+		data := AuthData{Name: input.Name, Email: "  Teste@Teste.COM ", Password: input.Password}
+		const want = "teste@teste.com"
+
+		err := NewCreateAuthUseCase(repo, hs, us).Execute(context.Background(), data)
+		if err != nil {
+			t.Fatalf("Execute() unexpected error: %v", err)
+		}
+
+		// O "já existe?" precisa buscar o mesmo valor que vai ser salvo; senão
+		// Teste@ passa na checagem e quebra no UNIQUE do banco.
+		if repo.findEmail != want {
+			t.Errorf("FindByEmail() email = %q, want %q", repo.findEmail, want)
+		}
+		if us.createEmail != want {
+			t.Errorf("CreateUser() email = %q, want %q", us.createEmail, want)
+		}
+		if repo.createdEntity.Email != want {
+			t.Errorf("CreateAuth() email = %q, want %q", repo.createdEntity.Email, want)
+		}
+	})
+
+	t.Run("Error email already exists with different case", func(t *testing.T) {
+		t.Parallel()
+
+		repo, hs, us := deps()
+		repo.findErr = nil
+		data := AuthData{Name: input.Name, Email: "Teste@Teste.com", Password: input.Password}
+
+		err := NewCreateAuthUseCase(repo, hs, us).Execute(context.Background(), data)
+		if !errors.Is(err, repository.ErrAuthAlreadyExists) {
+			t.Fatalf("Execute() = error %v; want %v", err, repository.ErrAuthAlreadyExists)
+		}
+		if repo.findEmail != input.Email {
+			t.Errorf("FindByEmail() email = %q, want %q", repo.findEmail, input.Email)
+		}
+		if us.createCalled {
+			t.Error("CreateUser() called, want no user created for a taken email")
+		}
+	})
+
 	t.Run("Error invalid input", func(t *testing.T) {
 		t.Parallel()
 
@@ -152,6 +196,8 @@ func TestCreateAuthUseCase(t *testing.T) {
 			wantErr  []error
 		}{
 			{name: "invalid email", email: "teste.teste.com", password: input.Password, wantErr: []error{entity.ErrInvalidEmail}},
+			{name: "email with display name", email: "Teste <teste@teste.com>", password: input.Password, wantErr: []error{entity.ErrInvalidEmail}},
+			{name: "email with only spaces", email: "   ", password: input.Password, wantErr: []error{entity.ErrInvalidEmail}},
 			{name: "invalid password", email: input.Email, password: "123", wantErr: []error{entity.ErrInvalidPassword}},
 			{name: "both invalid", email: "teste.teste.com", password: "123", wantErr: []error{entity.ErrInvalidEmail, entity.ErrInvalidPassword}},
 		}
