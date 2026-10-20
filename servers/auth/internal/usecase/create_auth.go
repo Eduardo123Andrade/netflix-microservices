@@ -10,17 +10,12 @@ import (
 )
 
 type authRepository interface {
-	CreateAuth(ctx context.Context, data entity.Auth) error
-	FindByEmail(ctx context.Context, email string) (entity.Auth, error)
+	authCreator
+	authFinder
 }
-
-type hashService interface {
-	Hash(password string) (string, error)
-}
-
 type userService interface {
-	CreateUser(ctx context.Context, name, email string) (userID string, err error)
-	DeleteUser(ctx context.Context, userID string) error
+	userCreator
+	userDeleter
 }
 
 type AuthData struct {
@@ -29,11 +24,11 @@ type AuthData struct {
 
 type AuthUseCase struct {
 	repo authRepository
-	hs   hashService
+	hs   passwordHasher
 	us   userService
 }
 
-func NewCreateAuthUseCase(repo authRepository, hs hashService, us userService) *AuthUseCase {
+func NewCreateAuthUseCase(repo authRepository, hs passwordHasher, us userService) *AuthUseCase {
 	return &AuthUseCase{repo: repo, hs: hs, us: us}
 }
 
