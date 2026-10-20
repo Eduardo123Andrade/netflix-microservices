@@ -24,6 +24,7 @@ var expect = Config{
 	UserServerAddr: "localhost:50051",
 	JWT: JWT{
 		PrivateKeyPath: "keys/test.pem",
+		Issuer:         "netflix-auth-test",
 		TTL:            15 * time.Minute,
 	},
 }
@@ -39,6 +40,7 @@ func initEnv(t *testing.T) {
 	t.Setenv("HASH_COST", strconv.Itoa(expect.Cost))
 	t.Setenv("USER_SERVER_ADDR", expect.UserServerAddr)
 	t.Setenv("JWT_PRIVATE_KEY_PATH", expect.JWT.PrivateKeyPath)
+	t.Setenv("JWT_ISSUER", expect.JWT.Issuer)
 	t.Setenv("JWT_TTL", expect.JWT.TTL.String())
 }
 
@@ -76,6 +78,8 @@ func TestLoadInvalidEnv(t *testing.T) {
 		{name: "USER_SERVER_ADDR empty", envName: "USER_SERVER_ADDR", envValue: "", wantErr: env.ErrEmpty},
 		{name: "JWT_PRIVATE_KEY_PATH ausente", envName: "JWT_PRIVATE_KEY_PATH", unset: true, wantErr: env.ErrRequired},
 		{name: "JWT_PRIVATE_KEY_PATH empty", envName: "JWT_PRIVATE_KEY_PATH", envValue: "", wantErr: env.ErrEmpty},
+		{name: "JWT_ISSUER ausente", envName: "JWT_ISSUER", unset: true, wantErr: env.ErrRequired},
+		{name: "JWT_ISSUER empty", envName: "JWT_ISSUER", envValue: "", wantErr: env.ErrEmpty},
 		{name: "JWT_TTL ausente", envName: "JWT_TTL", unset: true, wantErr: env.ErrRequired},
 		{name: "JWT_TTL without unit", envName: "JWT_TTL", envValue: "15", wantErr: env.ErrNotDuration},
 		// Abaixo de 1 minuto o token vence antes de o cliente conseguir usá-lo.

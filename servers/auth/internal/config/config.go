@@ -15,6 +15,7 @@ type Database struct {
 }
 type JWT struct {
 	PrivateKeyPath string
+	Issuer         string
 	TTL            time.Duration
 }
 
@@ -42,6 +43,7 @@ func Load() (Config, error) {
 		UserServerAddr: r.String("USER_SERVER_ADDR"),
 		JWT: JWT{
 			PrivateKeyPath: r.String("JWT_PRIVATE_KEY_PATH"),
+			Issuer:         r.String("JWT_ISSUER"),
 			TTL:            r.DurationRange("JWT_TTL", time.Minute, 24*time.Hour),
 		},
 	}
