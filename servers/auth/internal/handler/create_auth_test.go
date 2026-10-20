@@ -85,8 +85,10 @@ func decodeToken(t *testing.T, rec *httptest.ResponseRecorder) tokenResponse {
 	if err := json.Unmarshal(rec.Body.Bytes(), &raw); err != nil {
 		t.Fatalf("decoding token body %q: %v", rec.Body.String(), err)
 	}
-	if _, ok := raw["access_token"]; !ok {
-		t.Errorf("body = %s, want an access_token key", rec.Body.String())
+	for _, key := range []string{"access_token", "token_type"} {
+		if _, ok := raw[key]; !ok {
+			t.Errorf("body = %s, want a %s key", rec.Body.String(), key)
+		}
 	}
 
 	var resp tokenResponse
@@ -131,8 +133,13 @@ func TestCreateAuthHandler(t *testing.T) {
 		if rec.Code != http.StatusCreated {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusCreated)
 		}
-		if got := decodeToken(t, rec); got.AccessToken != fakeToken {
+		got := decodeToken(t, rec)
+		if got.AccessToken != fakeToken {
 			t.Errorf("access_token = %q, want %q", got.AccessToken, fakeToken)
+		}
+		// O cliente usa o token_type para montar o header "Authorization: Bearer <token>".
+		if got.TokenType != "Bearer" {
+			t.Errorf("token_type = %q, want %q", got.TokenType, "Bearer")
 		}
 
 		want := usecase.AuthData{

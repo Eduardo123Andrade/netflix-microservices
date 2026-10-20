@@ -218,12 +218,16 @@ func tokenSubject(t *testing.T, ts *services.TokenService, body string) string {
 
 	var resp struct {
 		AccessToken string `json:"access_token"`
+		TokenType   string `json:"token_type"`
 	}
 	if err := json.Unmarshal([]byte(body), &resp); err != nil {
 		t.Fatalf("decoding token body %q: %v", body, err)
 	}
 	if resp.AccessToken == "" {
 		t.Fatalf("body = %q; want a non-empty access_token", body)
+	}
+	if resp.TokenType != "Bearer" {
+		t.Errorf("token_type = %q; want %q", resp.TokenType, "Bearer")
 	}
 
 	set, err := ts.JWKS()
