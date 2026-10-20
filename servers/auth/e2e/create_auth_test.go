@@ -5,8 +5,11 @@ package e2e
 import (
 	"auth/internal/database"
 	"auth/internal/router"
+	"auth/internal/services"
 	"auth/internal/testutil"
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
 	"encoding/json"
 	"io"
 	"net"
@@ -14,8 +17,10 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/lestrrat-go/jwx/v3/jwt"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -37,8 +42,10 @@ func TestCreateAuthEndpoint(t *testing.T) {
 	usersAddr := testutil.StartFakeUsers(t, &testutil.FakeUsersServer{})
 	users := testutil.DialUsers(t, usersAddr)
 
+	tokens := newTokenService(t)
+
 	// Custo mínimo do bcrypt: o teste fica rápido.
-	srv := httptest.NewServer(router.New(router.Deps{DB: pool, Cost: 4, Users: users}))
+	srv := httptest.NewServer(router.New(router.Deps{DB: pool, Cost: 4, Users: users, Tokens: tokens}))
 	t.Cleanup(srv.Close)
 
 	url := srv.URL + createAuthPath
@@ -55,8 +62,12 @@ func TestCreateAuthEndpoint(t *testing.T) {
 		if status != http.StatusCreated {
 			t.Fatalf("status = %d; want %d (body %q)", status, http.StatusCreated, body)
 		}
-		if body != "" {
-			t.Errorf("body = %q; want empty", body)
+
+		// O token devolvido precisa ser válido pelo JWKS e apontar para o
+		// usuário criado no users.
+		sub := tokenSubject(t, tokens, body)
+		if sub != testutil.FakeUserID {
+			t.Errorf("token sub = %q; want %q (the ID returned by the users service)", sub, testutil.FakeUserID)
 		}
 
 		if n := countAuthByEmail(t, pool, "e2e1@teste.com"); n != 1 {
@@ -161,7 +172,7 @@ func TestCreateAuthEndpoint(t *testing.T) {
 		t.Parallel()
 
 		down := testutil.DialUsers(t, closedAddr(t))
-		srvDown := httptest.NewServer(router.New(router.Deps{DB: pool, Cost: 4, Users: down}))
+		srvDown := httptest.NewServer(router.New(router.Deps{DB: pool, Cost: 4, Users: down, Tokens: tokens}))
 		t.Cleanup(srvDown.Close)
 
 		code, resp := postJSON(t, srvDown.URL+createAuthPath, `{
@@ -180,6 +191,57 @@ func TestCreateAuthEndpoint(t *testing.T) {
 			t.Errorf("rows with email = %d; want 0", n)
 		}
 	})
+}
+
+// newTokenService monta o token service real com uma chave gerada em memória,
+// sem depender do arquivo de chave do ambiente.
+func newTokenService(t *testing.T) *services.TokenService {
+	t.Helper()
+
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("rsa.GenerateKey() unexpected error: %v", err)
+	}
+
+	ts, err := services.NewTokenService(key, "netflix-auth-e2e", 15*time.Minute)
+	if err != nil {
+		t.Fatalf("NewTokenService() unexpected error: %v", err)
+	}
+
+	return ts
+}
+
+// tokenSubject lê o access_token da resposta, valida a assinatura com o JWKS
+// (como o gateway fará) e devolve o "sub".
+func tokenSubject(t *testing.T, ts *services.TokenService, body string) string {
+	t.Helper()
+
+	var resp struct {
+		AccessToken string `json:"access_token"`
+	}
+	if err := json.Unmarshal([]byte(body), &resp); err != nil {
+		t.Fatalf("decoding token body %q: %v", body, err)
+	}
+	if resp.AccessToken == "" {
+		t.Fatalf("body = %q; want a non-empty access_token", body)
+	}
+
+	set, err := ts.JWKS()
+	if err != nil {
+		t.Fatalf("JWKS() unexpected error: %v", err)
+	}
+
+	tok, err := jwt.Parse([]byte(resp.AccessToken), jwt.WithKeySet(set))
+	if err != nil {
+		t.Fatalf("parsing access_token: %v", err)
+	}
+
+	sub, ok := tok.Subject()
+	if !ok {
+		t.Fatalf("access_token without sub")
+	}
+
+	return sub
 }
 
 // closedAddr devolve um endereço local em que nada escuta: abre uma porta

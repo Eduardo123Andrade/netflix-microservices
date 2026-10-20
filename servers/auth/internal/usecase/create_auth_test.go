@@ -93,6 +93,16 @@ func deps() (*fakeAuthRepository, *fakeHasher, *fakeUserService) {
 		&fakeUserService{userID: fakeUserID}
 }
 
+// wantNoUserID confere que um Execute com erro não devolve ID: o handler
+// geraria um token para um usuário que não ficou cadastrado.
+func wantNoUserID(t *testing.T, userID string) {
+	t.Helper()
+
+	if userID != "" {
+		t.Errorf("Execute() userID = %q, want empty on error", userID)
+	}
+}
+
 var input = AuthData{
 	Name:     "Eduardo",
 	Email:    "teste@teste.com",
@@ -106,11 +116,14 @@ func TestCreateAuthUseCase(t *testing.T) {
 		t.Parallel()
 
 		repo, hs, us := deps()
-		err := NewCreateAuthUseCase(repo, hs, us).Execute(context.Background(), input)
+		userID, err := NewCreateAuthUseCase(repo, hs, us).Execute(context.Background(), input)
 		if err != nil {
 			t.Fatalf("Execute() unexpected error: %v", err)
 		}
 
+		if userID != fakeUserID {
+			t.Errorf("Execute() userID = %q, want %q (the ID from the users service)", userID, fakeUserID)
+		}
 		if repo.findEmail != input.Email {
 			t.Errorf("FindByEmail() email = %q, want %q", repo.findEmail, input.Email)
 		}
@@ -149,7 +162,7 @@ func TestCreateAuthUseCase(t *testing.T) {
 		data := AuthData{Name: input.Name, Email: "  Teste@Teste.COM ", Password: input.Password}
 		const want = "teste@teste.com"
 
-		err := NewCreateAuthUseCase(repo, hs, us).Execute(context.Background(), data)
+		_, err := NewCreateAuthUseCase(repo, hs, us).Execute(context.Background(), data)
 		if err != nil {
 			t.Fatalf("Execute() unexpected error: %v", err)
 		}
@@ -174,7 +187,8 @@ func TestCreateAuthUseCase(t *testing.T) {
 		repo.findErr = nil
 		data := AuthData{Name: input.Name, Email: "Teste@Teste.com", Password: input.Password}
 
-		err := NewCreateAuthUseCase(repo, hs, us).Execute(context.Background(), data)
+		userID, err := NewCreateAuthUseCase(repo, hs, us).Execute(context.Background(), data)
+		wantNoUserID(t, userID)
 		if !errors.Is(err, repository.ErrAuthAlreadyExists) {
 			t.Fatalf("Execute() = error %v; want %v", err, repository.ErrAuthAlreadyExists)
 		}
@@ -209,7 +223,8 @@ func TestCreateAuthUseCase(t *testing.T) {
 				repo, hs, us := deps()
 				data := AuthData{Name: input.Name, Email: tt.email, Password: tt.password}
 
-				err := NewCreateAuthUseCase(repo, hs, us).Execute(context.Background(), data)
+				userID, err := NewCreateAuthUseCase(repo, hs, us).Execute(context.Background(), data)
+				wantNoUserID(t, userID)
 				for _, want := range tt.wantErr {
 					if !errors.Is(err, want) {
 						t.Errorf("Execute() = error %v; want it to include %v", err, want)
@@ -231,7 +246,8 @@ func TestCreateAuthUseCase(t *testing.T) {
 		repo, hs, us := deps()
 		repo.findErr = nil
 
-		err := NewCreateAuthUseCase(repo, hs, us).Execute(context.Background(), input)
+		userID, err := NewCreateAuthUseCase(repo, hs, us).Execute(context.Background(), input)
+		wantNoUserID(t, userID)
 		if !errors.Is(err, repository.ErrAuthAlreadyExists) {
 			t.Fatalf("Execute() = error %v; want %v", err, repository.ErrAuthAlreadyExists)
 		}
@@ -247,7 +263,8 @@ func TestCreateAuthUseCase(t *testing.T) {
 		dbErr := errors.New("connection refused")
 		repo.findErr = dbErr
 
-		err := NewCreateAuthUseCase(repo, hs, us).Execute(context.Background(), input)
+		userID, err := NewCreateAuthUseCase(repo, hs, us).Execute(context.Background(), input)
+		wantNoUserID(t, userID)
 		if !errors.Is(err, dbErr) {
 			t.Fatalf("Execute() = error %v; want it to wrap %v", err, dbErr)
 		}
@@ -266,7 +283,8 @@ func TestCreateAuthUseCase(t *testing.T) {
 		hashErr := errors.New("bcrypt: cost out of range")
 		hs.err = hashErr
 
-		err := NewCreateAuthUseCase(repo, hs, us).Execute(context.Background(), input)
+		userID, err := NewCreateAuthUseCase(repo, hs, us).Execute(context.Background(), input)
+		wantNoUserID(t, userID)
 		if !errors.Is(err, hashErr) {
 			t.Fatalf("Execute() = error %v; want it to wrap %v", err, hashErr)
 		}
@@ -282,7 +300,8 @@ func TestCreateAuthUseCase(t *testing.T) {
 		usersErr := errors.New("users: unavailable")
 		us.createErr = usersErr
 
-		err := NewCreateAuthUseCase(repo, hs, us).Execute(context.Background(), input)
+		userID, err := NewCreateAuthUseCase(repo, hs, us).Execute(context.Background(), input)
+		wantNoUserID(t, userID)
 		if !errors.Is(err, usersErr) {
 			t.Fatalf("Execute() = error %v; want it to wrap %v", err, usersErr)
 		}
@@ -300,7 +319,9 @@ func TestCreateAuthUseCase(t *testing.T) {
 		repo, hs, us := deps()
 		us.userID = "abc"
 
-		err := NewCreateAuthUseCase(repo, hs, us).Execute(context.Background(), input)
+		// O users chegou a devolver um ID, mas ele foi desfeito: não pode vazar.
+		userID, err := NewCreateAuthUseCase(repo, hs, us).Execute(context.Background(), input)
+		wantNoUserID(t, userID)
 		if !errors.Is(err, entity.ErrInvalidUserID) {
 			t.Fatalf("Execute() = error %v; want it to include %v", err, entity.ErrInvalidUserID)
 		}
@@ -330,7 +351,9 @@ func TestCreateAuthUseCase(t *testing.T) {
 				repo, hs, us := deps()
 				repo.createErr = tt.createErr
 
-				err := NewCreateAuthUseCase(repo, hs, us).Execute(context.Background(), input)
+				// O usuário foi compensado; devolver o ID dele levaria a um token órfão.
+				userID, err := NewCreateAuthUseCase(repo, hs, us).Execute(context.Background(), input)
+				wantNoUserID(t, userID)
 				if !errors.Is(err, tt.createErr) {
 					t.Fatalf("Execute() = error %v; want it to wrap %v", err, tt.createErr)
 				}
@@ -350,7 +373,8 @@ func TestCreateAuthUseCase(t *testing.T) {
 		repo.createErr = saveErr
 		us.deleteErr = deleteErr
 
-		err := NewCreateAuthUseCase(repo, hs, us).Execute(context.Background(), input)
+		userID, err := NewCreateAuthUseCase(repo, hs, us).Execute(context.Background(), input)
+		wantNoUserID(t, userID)
 		if !errors.Is(err, saveErr) {
 			t.Errorf("Execute() = error %v; want it to wrap the save error %v", err, saveErr)
 		}
