@@ -1,9 +1,10 @@
 package entity
 
 import (
-	"auth/internal/utils"
 	"errors"
 	"fmt"
+
+	"auth/internal/utils"
 )
 
 type Auth struct {
@@ -40,20 +41,25 @@ func ValidateUserID(userID string) error {
 	return nil
 }
 
+func NormalizeEmail(email string) string {
+	return utils.NormalizeEmail(email)
+}
+
 func NewAuth(email, passwordHash, userID string) (Auth, error) {
-	if err := errors.Join(ValidateEmail(email), ValidateUserID(userID)); err != nil {
+	normalizedEmail := NormalizeEmail(email)
+
+	if err := errors.Join(ValidateEmail(normalizedEmail), ValidateUserID(userID)); err != nil {
 		return Auth{}, err
 	}
 
 	id, err := utils.GenerateUUID()
-
 	if err != nil {
 		return Auth{}, fmt.Errorf("new auth: generate id: %w", err)
 	}
 
 	return Auth{
 		ID:           id,
-		Email:        email,
+		Email:        normalizedEmail,
 		PasswordHash: passwordHash,
 		UserID:       userID,
 	}, nil

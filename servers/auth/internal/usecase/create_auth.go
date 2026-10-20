@@ -1,11 +1,12 @@
 package usecase
 
 import (
-	"auth/internal/entity"
-	"auth/internal/repository"
 	"context"
 	"errors"
 	"fmt"
+
+	"auth/internal/entity"
+	"auth/internal/repository"
 )
 
 type authRepository interface {
@@ -39,11 +40,13 @@ func NewCreateAuthUseCase(repo authRepository, hs hashService, us userService) *
 // Execute é a saga do cadastro. Tudo que pode falhar sem depender do serviço
 // users vem antes do CreateUser; depois dele, qualquer falha desfaz o usuário.
 func (a *AuthUseCase) Execute(ctx context.Context, data AuthData) error {
-	if err := errors.Join(entity.ValidateEmail(data.Email), entity.ValidatePassword(data.Password)); err != nil {
+	normalizedEmail := entity.NormalizeEmail(data.Email)
+
+	if err := errors.Join(entity.ValidateEmail(normalizedEmail), entity.ValidatePassword(data.Password)); err != nil {
 		return fmt.Errorf("create auth: %w", err)
 	}
 
-	_, err := a.repo.FindByEmail(ctx, data.Email)
+	_, err := a.repo.FindByEmail(ctx, normalizedEmail)
 	switch {
 	case err == nil:
 		return repository.ErrAuthAlreadyExists
@@ -56,12 +59,12 @@ func (a *AuthUseCase) Execute(ctx context.Context, data AuthData) error {
 		return fmt.Errorf("create auth: hash password: %w", err)
 	}
 
-	userID, err := a.us.CreateUser(ctx, data.Name, data.Email)
+	userID, err := a.us.CreateUser(ctx, data.Name, normalizedEmail)
 	if err != nil {
 		return fmt.Errorf("create auth: create user: %w", err)
 	}
 
-	authEntity, err := entity.NewAuth(data.Email, passwordHash, userID)
+	authEntity, err := entity.NewAuth(normalizedEmail, passwordHash, userID)
 	if err != nil {
 		return a.compensate(ctx, userID, fmt.Errorf("create auth: new auth: %w", err))
 	}
