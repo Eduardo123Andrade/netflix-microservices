@@ -9,7 +9,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"net/http/httptest"
 	"reflect"
 	"testing"
 )
@@ -24,8 +23,7 @@ func TestHealthEndpoint(t *testing.T) {
 	}
 	t.Cleanup(pool.Close)
 
-	srv := httptest.NewServer(router.New(router.Deps{DB: pool}))
-	t.Cleanup(srv.Close)
+	srv := newServer(t, router.Deps{DB: pool})
 
 	t.Run("banco disponível", func(t *testing.T) {
 		status, body := getJSON(t, srv.URL+"/api/health")
