@@ -1,11 +1,12 @@
 package router
 
 import (
+	"net/http"
+
 	"auth/internal/handler"
 	"auth/internal/repository"
 	"auth/internal/services"
 	"auth/internal/usecase"
-	"net/http"
 )
 
 func registerCreateAuth(mux *http.ServeMux, d Deps) {
@@ -15,7 +16,7 @@ func registerCreateAuth(mux *http.ServeMux, d Deps) {
 	us := services.NewUserService(d.Users)
 
 	uc := usecase.NewCreateAuthUseCase(r, hs, us)
-	h := handler.CreateAuth(uc)
+	h := handler.CreateAuth(uc, d.Tokens)
 
 	mux.HandleFunc("POST /api/auth/create_user", h)
 }
