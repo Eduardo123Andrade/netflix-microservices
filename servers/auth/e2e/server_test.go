@@ -6,7 +6,11 @@ import (
 	"auth/internal/router"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
+
+// e2eRefreshTTL é a validade dos refresh tokens nos testes de ponta a ponta.
+const e2eRefreshTTL = 30 * 24 * time.Hour
 
 // newServer sobe o router real num servidor HTTP de teste e o fecha no fim.
 func newServer(t *testing.T, deps router.Deps) *httptest.Server {

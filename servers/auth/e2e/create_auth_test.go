@@ -44,7 +44,7 @@ func TestCreateAuthEndpoint(t *testing.T) {
 	tokens := newTokenService(t)
 
 	// Custo mínimo do bcrypt: o teste fica rápido.
-	srv := newServer(t, router.Deps{DB: pool, Cost: 4, Users: users, Tokens: tokens})
+	srv := newServer(t, router.Deps{DB: pool, Cost: 4, Users: users, Tokens: tokens, RefreshTTL: e2eRefreshTTL})
 
 	url := srv.URL + createAuthPath
 
@@ -170,7 +170,7 @@ func TestCreateAuthEndpoint(t *testing.T) {
 		t.Parallel()
 
 		down := testutil.DialUsers(t, closedAddr(t))
-		srvDown := newServer(t, router.Deps{DB: pool, Cost: 4, Users: down, Tokens: tokens})
+		srvDown := newServer(t, router.Deps{DB: pool, Cost: 4, Users: down, Tokens: tokens, RefreshTTL: e2eRefreshTTL})
 
 		code, resp := postJSON(t, srvDown.URL+createAuthPath, `{
 			"email": "e2e4@teste.com",

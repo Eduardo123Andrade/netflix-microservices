@@ -37,10 +37,16 @@ func (f *fakeLogin) Execute(ctx context.Context, data usecase.LoginData) (string
 func doLogin(t *testing.T, uc loginExecutor, ts tokenService, body string) *httptest.ResponseRecorder {
 	t.Helper()
 
+	return doLoginWithRefresh(t, uc, ts, &fakeRefreshIssuer{}, body)
+}
+
+func doLoginWithRefresh(t *testing.T, uc loginExecutor, ts tokenService, rt refreshIssuer, body string) *httptest.ResponseRecorder {
+	t.Helper()
+
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 
-	Login(uc, ts).ServeHTTP(rec, req)
+	Login(uc, ts, rt).ServeHTTP(rec, req)
 
 	return rec
 }
@@ -58,7 +64,8 @@ func TestLoginHandler(t *testing.T) {
 
 		uc := &fakeLogin{userID: fakeUserID}
 		ts := &fakeTokenService{}
-		rec := doLogin(t, uc, ts, validLoginBody)
+		rt := &fakeRefreshIssuer{}
+		rec := doLoginWithRefresh(t, uc, ts, rt, validLoginBody)
 
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
@@ -67,6 +74,12 @@ func TestLoginHandler(t *testing.T) {
 		got := decodeToken(t, rec)
 		if got.AccessToken != fakeToken {
 			t.Errorf("access_token = %q, want %q", got.AccessToken, fakeToken)
+		}
+		if got.RefreshToken != fakeRefreshToken {
+			t.Errorf("refresh_token = %q, want %q", got.RefreshToken, fakeRefreshToken)
+		}
+		if rt.userID != fakeUserID {
+			t.Errorf("Issue() userID = %q, want %q", rt.userID, fakeUserID)
 		}
 		if got.TokenType != "Bearer" {
 			t.Errorf("token_type = %q, want %q", got.TokenType, "Bearer")
@@ -89,6 +102,21 @@ func TestLoginHandler(t *testing.T) {
 		ts := &fakeTokenService{err: errors.New("sign token: key unavailable")}
 		rec := doLogin(t, &fakeLogin{userID: fakeUserID}, ts, validLoginBody)
 
+		if rec.Code != http.StatusInternalServerError {
+			t.Errorf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+		}
+		if got := decodeError(t, rec); got != "internal error" {
+			t.Errorf("error = %q, want %q", got, "internal error")
+		}
+	})
+
+	t.Run("Error issuing refresh token", func(t *testing.T) {
+		t.Parallel()
+
+		rt := &fakeRefreshIssuer{err: errors.New("insert refresh token: connection refused")}
+		rec := doLoginWithRefresh(t, &fakeLogin{userID: fakeUserID}, &fakeTokenService{}, rt, validLoginBody)
+
+		// Sem refresh a sessão morreria junto com o access token: não é um login completo.
 		if rec.Code != http.StatusInternalServerError {
 			t.Errorf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
 		}

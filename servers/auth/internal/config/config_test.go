@@ -26,6 +26,7 @@ var expect = Config{
 		PrivateKeyPath: "keys/test.pem",
 		Issuer:         "netflix-auth-test",
 		TTL:            15 * time.Minute,
+		RefreshTTL:     30 * 24 * time.Hour,
 	},
 }
 
@@ -42,6 +43,7 @@ func initEnv(t *testing.T) {
 	t.Setenv("JWT_PRIVATE_KEY_PATH", expect.JWT.PrivateKeyPath)
 	t.Setenv("JWT_ISSUER", expect.JWT.Issuer)
 	t.Setenv("JWT_TTL", expect.JWT.TTL.String())
+	t.Setenv("JWT_REFRESH_TTL", expect.JWT.RefreshTTL.String())
 }
 
 func TestLoad(t *testing.T) {
@@ -86,6 +88,11 @@ func TestLoadInvalidEnv(t *testing.T) {
 		{name: "JWT_TTL below minimum", envName: "JWT_TTL", envValue: "30s", wantErr: env.ErrOutOfRange},
 		// Sem revogação, um token vazado vale até vencer; o teto limita o estrago.
 		{name: "JWT_TTL above max", envName: "JWT_TTL", envValue: "25h", wantErr: env.ErrOutOfRange},
+		{name: "JWT_REFRESH_TTL ausente", envName: "JWT_REFRESH_TTL", unset: true, wantErr: env.ErrRequired},
+		// Menos de 1h e o refresh vence quase junto com o access token: perde o sentido.
+		{name: "JWT_REFRESH_TTL below minimum", envName: "JWT_REFRESH_TTL", envValue: "30m", wantErr: env.ErrOutOfRange},
+		// Teto de 90 dias: um refresh vazado não vale para sempre.
+		{name: "JWT_REFRESH_TTL above max", envName: "JWT_REFRESH_TTL", envValue: "2161h", wantErr: env.ErrOutOfRange},
 	}
 
 	for _, tt := range tests {

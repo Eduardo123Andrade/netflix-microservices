@@ -28,7 +28,7 @@ func TestLoginEndpoint(t *testing.T) {
 	users := testutil.DialUsers(t, usersAddr)
 	tokens := newTokenService(t)
 
-	srv := newServer(t, router.Deps{DB: pool, Cost: 4, Users: users, Tokens: tokens})
+	srv := newServer(t, router.Deps{DB: pool, Cost: 4, Users: users, Tokens: tokens, RefreshTTL: e2eRefreshTTL})
 
 	// A conta é criada pelo próprio endpoint de cadastro: o login lê o que o
 	// cadastro gravou, com o hash bcrypt de verdade.
