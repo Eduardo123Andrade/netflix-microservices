@@ -17,6 +17,7 @@ type JWT struct {
 	PrivateKeyPath string
 	Issuer         string
 	TTL            time.Duration
+	RefreshTTL     time.Duration
 }
 
 type Config struct {
@@ -45,6 +46,7 @@ func Load() (Config, error) {
 			PrivateKeyPath: r.String("JWT_PRIVATE_KEY_PATH"),
 			Issuer:         r.String("JWT_ISSUER"),
 			TTL:            r.DurationRange("JWT_TTL", time.Minute, 24*time.Hour),
+			RefreshTTL:     r.DurationRange("JWT_REFRESH_TTL", time.Hour, 90*24*time.Hour),
 		},
 	}
 

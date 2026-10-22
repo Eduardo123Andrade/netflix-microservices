@@ -2,7 +2,6 @@ package handler
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
@@ -20,19 +19,13 @@ type loginRequest struct {
 	Password string `json:"password"`
 }
 
-// Login autentica por email e senha e devolve um access token. Email
+// Login autentica por email e senha e devolve access e refresh token. Email
 // inexistente, senha errada e hash corrompido respondem igual (401), para o
 // cliente não descobrir quais emails têm conta.
-func Login(uc loginExecutor, ts tokenService) http.HandlerFunc {
+func Login(uc loginExecutor, ts tokenService, rt refreshIssuer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
-
-		dec := json.NewDecoder(r.Body)
-		dec.DisallowUnknownFields()
-
 		var req loginRequest
-		if err := dec.Decode(&req); err != nil {
-			writeJSON(w, http.StatusBadRequest, errorResponse{Error: "invalid request body"})
+		if !decodeJSON(w, r, &req) {
 			return
 		}
 
@@ -60,15 +53,15 @@ func Login(uc loginExecutor, ts tokenService) http.HandlerFunc {
 			return
 		}
 
-		// Diferente do cadastro: no login o token é o próprio resultado, então
-		// sem token não houve login.
-		token, err := ts.Generate(userID)
+		// Diferente do cadastro: no login os tokens são o próprio resultado, então
+		// sem eles não houve login.
+		tokens, err := issueTokens(r.Context(), ts, rt, userID)
 		if err != nil {
-			log.Printf("login: generate token: %v", err)
+			log.Printf("login: %v", err)
 			writeJSON(w, http.StatusInternalServerError, errorResponse{Error: "internal error"})
 			return
 		}
 
-		writeJSON(w, http.StatusOK, tokenResponse{AccessToken: token, TokenType: "Bearer"})
+		writeTokens(w, http.StatusOK, tokens)
 	}
 }

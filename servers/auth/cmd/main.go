@@ -31,10 +31,11 @@ func main() {
 	defer closeConns()
 
 	r, err := router.New(router.Deps{
-		DB:     conns.db,
-		Cost:   c.Cost,
-		Users:  usersv1.NewUserServiceClient(conns.users),
-		Tokens: tokens,
+		DB:         conns.db,
+		Cost:       c.Cost,
+		Users:      usersv1.NewUserServiceClient(conns.users),
+		Tokens:     tokens,
+		RefreshTTL: c.JWT.RefreshTTL,
 	})
 	if err != nil {
 		log.Fatal(err)
