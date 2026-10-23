@@ -14,33 +14,6 @@ type Auth struct {
 	UserID       string
 }
 
-var (
-	ErrInvalidEmail    = errors.New("invalid email")
-	ErrInvalidPassword = errors.New("invalid password")
-	ErrInvalidUserID   = errors.New("invalid user id")
-)
-
-func ValidateEmail(email string) error {
-	if !utils.IsEmail(email) {
-		return ErrInvalidEmail
-	}
-	return nil
-}
-
-func ValidatePassword(password string) error {
-	if !utils.IsValidPassword(password) {
-		return ErrInvalidPassword
-	}
-	return nil
-}
-
-func ValidateUserID(userID string) error {
-	if !utils.IsUUIDV7(userID) {
-		return ErrInvalidUserID
-	}
-	return nil
-}
-
 func NormalizeEmail(email string) string {
 	return utils.NormalizeEmail(email)
 }
