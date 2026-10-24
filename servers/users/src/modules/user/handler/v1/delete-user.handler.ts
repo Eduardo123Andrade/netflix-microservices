@@ -3,6 +3,7 @@ import type {
   DeleteUserRequest,
   DeleteUserResponse,
 } from '@/generated/grpc/users/v1/users'
+import { toGrpcError } from '@/shared/grpc'
 import { DeleteUserUseCase } from '../../use-cases'
 
 export const deleteUserHandler: handleUnaryCall<
@@ -15,6 +16,6 @@ export const deleteUserHandler: handleUnaryCall<
     })
     callback(null, {})
   } catch (error) {
-    callback(error as Error)
+    callback(toGrpcError(error))
   }
 }

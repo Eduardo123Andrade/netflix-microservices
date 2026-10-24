@@ -3,6 +3,7 @@ import type {
   CreateUserRequest,
   CreateUserResponse,
 } from '@/generated/grpc/users/v1/users'
+import { toGrpcError } from '@/shared/grpc'
 import { CreateUserUseCase } from '../../use-cases'
 
 export const createUserHandler: handleUnaryCall<
@@ -16,6 +17,6 @@ export const createUserHandler: handleUnaryCall<
     })
     callback(null, { userId })
   } catch (error) {
-    callback(error as Error)
+    callback(toGrpcError(error))
   }
 }
