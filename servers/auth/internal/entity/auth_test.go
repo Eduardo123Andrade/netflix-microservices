@@ -34,6 +34,19 @@ func TestNewAuth(t *testing.T) {
 		}
 	})
 
+	t.Run("Normalizes email", func(t *testing.T) {
+		t.Parallel()
+
+		got, err := NewAuth("  Teste@Teste.COM ", passwordHash, userID)
+		if err != nil {
+			t.Fatalf("NewAuth() unexpected error: %v", err)
+		}
+
+		if got.Email != email {
+			t.Errorf("email = %q, want %q (lowercase, without spaces around)", got.Email, email)
+		}
+	})
+
 	t.Run("Generates a UUID v7 ID", func(t *testing.T) {
 		t.Parallel()
 
@@ -65,6 +78,30 @@ func TestNewAuth(t *testing.T) {
 	})
 }
 
+func TestNormalizeEmail(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		value string
+		want  string
+	}{
+		{name: "already normalized", value: "teste@teste.com", want: "teste@teste.com"},
+		{name: "uppercase and spaces", value: "  Teste@Teste.COM ", want: "teste@teste.com"},
+		{name: "empty", value: "", want: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := NormalizeEmail(tt.value); got != tt.want {
+				t.Errorf("NormalizeEmail(%q) = %q, want %q", tt.value, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestNewAuthValidation(t *testing.T) {
 	t.Parallel()
 
@@ -86,6 +123,21 @@ func TestNewAuthValidation(t *testing.T) {
 		{
 			name:    "invalid email",
 			email:   "teste.teste.com",
+			userID:  validUserID,
+			wantErr: []error{ErrInvalidEmail},
+			notErr:  []error{ErrInvalidUserID},
+		},
+		{
+			// A normalização não pode "consertar" o formato com nome.
+			name:    "email with display name",
+			email:   "Teste <teste@teste.com>",
+			userID:  validUserID,
+			wantErr: []error{ErrInvalidEmail},
+			notErr:  []error{ErrInvalidUserID},
+		},
+		{
+			name:    "email with only spaces",
+			email:   "   ",
 			userID:  validUserID,
 			wantErr: []error{ErrInvalidEmail},
 			notErr:  []error{ErrInvalidUserID},

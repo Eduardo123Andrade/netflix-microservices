@@ -14,7 +14,13 @@ import (
 	"github.com/lestrrat-go/jwx/v3/jwt"
 )
 
-var ErrInvalidPrivateKey = errors.New("invalid jwt private key")
+var (
+	ErrInvalidPrivateKey = errors.New("invalid jwt private key")
+	ErrNilPrivateKey     = errors.New("private key is nil")
+	ErrKeyTooSmall       = errors.New("private key too small")
+)
+
+const minimumKeySizeInBits = 2048
 
 // TokenService emite access tokens JWT assinados com RS256. A chave privada
 // fica só aqui; a pública é publicada no JWKS para o gateway validar os
@@ -30,7 +36,16 @@ type TokenService struct {
 // podem gerar uma em memória). O "kid" é o thumbprint da chave, então muda
 // sozinho quando a chave muda, o que permite rotação.
 func NewTokenService(privateKey *rsa.PrivateKey, issuer string, ttl time.Duration) (*TokenService, error) {
+	if privateKey == nil {
+		return nil, fmt.Errorf("token service: %w: %w", ErrNilPrivateKey, ErrInvalidPrivateKey)
+	}
+
+	if privateKey.N.BitLen() < minimumKeySizeInBits {
+		return nil, fmt.Errorf("token service: %w: got %d bits, want at least %d bits: %w", ErrKeyTooSmall, privateKey.N.BitLen(), minimumKeySizeInBits, ErrInvalidPrivateKey)
+	}
+
 	priv, err := jwk.Import(privateKey)
+
 	if err != nil {
 		return nil, fmt.Errorf("token service: import private key: %w", err)
 	}

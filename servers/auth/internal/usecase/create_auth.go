@@ -1,25 +1,21 @@
 package usecase
 
 import (
-	"auth/internal/entity"
-	"auth/internal/repository"
 	"context"
 	"errors"
 	"fmt"
+
+	"auth/internal/entity"
+	"auth/internal/repository"
 )
 
 type authRepository interface {
-	CreateAuth(ctx context.Context, data entity.Auth) error
-	FindByEmail(ctx context.Context, email string) (entity.Auth, error)
+	authCreator
+	authFinder
 }
-
-type hashService interface {
-	Hash(password string) (string, error)
-}
-
 type userService interface {
-	CreateUser(ctx context.Context, name, email string) (userID string, err error)
-	DeleteUser(ctx context.Context, userID string) error
+	userCreator
+	userDeleter
 }
 
 type AuthData struct {
@@ -28,49 +24,51 @@ type AuthData struct {
 
 type AuthUseCase struct {
 	repo authRepository
-	hs   hashService
+	hs   passwordHasher
 	us   userService
 }
 
-func NewCreateAuthUseCase(repo authRepository, hs hashService, us userService) *AuthUseCase {
+func NewCreateAuthUseCase(repo authRepository, hs passwordHasher, us userService) *AuthUseCase {
 	return &AuthUseCase{repo: repo, hs: hs, us: us}
 }
 
 // Execute é a saga do cadastro. Tudo que pode falhar sem depender do serviço
 // users vem antes do CreateUser; depois dele, qualquer falha desfaz o usuário.
-func (a *AuthUseCase) Execute(ctx context.Context, data AuthData) error {
-	if err := errors.Join(entity.ValidateEmail(data.Email), entity.ValidatePassword(data.Password)); err != nil {
-		return fmt.Errorf("create auth: %w", err)
+func (a *AuthUseCase) Execute(ctx context.Context, data AuthData) (string, error) {
+	normalizedEmail := entity.NormalizeEmail(data.Email)
+
+	if err := errors.Join(entity.ValidateEmail(normalizedEmail), entity.ValidatePassword(data.Password)); err != nil {
+		return "", fmt.Errorf("create auth: %w", err)
 	}
 
-	_, err := a.repo.FindByEmail(ctx, data.Email)
+	_, err := a.repo.FindByEmail(ctx, normalizedEmail)
 	switch {
 	case err == nil:
-		return repository.ErrAuthAlreadyExists
+		return "", repository.ErrAuthAlreadyExists
 	case !errors.Is(err, repository.ErrAuthNotFound):
-		return fmt.Errorf("create auth: find by email: %w", err)
+		return "", fmt.Errorf("create auth: find by email: %w", err)
 	}
 
 	passwordHash, err := a.hs.Hash(data.Password)
 	if err != nil {
-		return fmt.Errorf("create auth: hash password: %w", err)
+		return "", fmt.Errorf("create auth: hash password: %w", err)
 	}
 
-	userID, err := a.us.CreateUser(ctx, data.Name, data.Email)
+	userID, err := a.us.CreateUser(ctx, data.Name, normalizedEmail)
 	if err != nil {
-		return fmt.Errorf("create auth: create user: %w", err)
+		return "", fmt.Errorf("create auth: create user: %w", err)
 	}
 
-	authEntity, err := entity.NewAuth(data.Email, passwordHash, userID)
+	authEntity, err := entity.NewAuth(normalizedEmail, passwordHash, userID)
 	if err != nil {
-		return a.compensate(ctx, userID, fmt.Errorf("create auth: new auth: %w", err))
+		return "", a.compensate(ctx, userID, fmt.Errorf("create auth: new auth: %w", err))
 	}
 
 	if err := a.repo.CreateAuth(ctx, authEntity); err != nil {
-		return a.compensate(ctx, userID, fmt.Errorf("create auth: save: %w", err))
+		return "", a.compensate(ctx, userID, fmt.Errorf("create auth: save: %w", err))
 	}
 
-	return nil
+	return userID, nil
 }
 
 // compensate desfaz o usuário criado e devolve o erro original. Se a

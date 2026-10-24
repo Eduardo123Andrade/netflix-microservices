@@ -6,13 +6,15 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var (
-	ErrRequired   = errors.New("is required")
-	ErrEmpty      = errors.New("cannot be empty")
-	ErrNotInteger = errors.New("must be an integer")
-	ErrOutOfRange = errors.New("out of range")
+	ErrRequired    = errors.New("is required")
+	ErrEmpty       = errors.New("cannot be empty")
+	ErrNotInteger  = errors.New("must be an integer")
+	ErrOutOfRange  = errors.New("out of range")
+	ErrNotDuration = errors.New("must be a duration")
 )
 
 type Reader struct {
@@ -74,6 +76,40 @@ func (r *Reader) parseInt(name string) (int, bool) {
 	}
 
 	return v, true
+}
+
+func (r *Reader) parseDuration(name string) (time.Duration, bool) {
+	value, ok := r.lookup(name)
+	if !ok {
+		return 0, false
+	}
+
+	v, err := time.ParseDuration(value)
+	if err != nil {
+		r.errs = append(r.errs, fmt.Errorf("%s %w, got %q", name, ErrNotDuration, value))
+		return 0, false
+	}
+
+	return v, true
+}
+
+func (r *Reader) Duration(name string) time.Duration {
+	value, _ := r.parseDuration(name)
+	return value
+}
+
+func (r *Reader) DurationRange(name string, min, max time.Duration) time.Duration {
+	v, ok := r.parseDuration(name)
+	if !ok {
+		return 0
+	}
+
+	if v < min || v > max {
+		r.errs = append(r.errs, fmt.Errorf("%s %w [%s, %s], got %s", name, ErrOutOfRange, min, max, v))
+		return 0
+	}
+
+	return v
 }
 
 func (r *Reader) Err() error {

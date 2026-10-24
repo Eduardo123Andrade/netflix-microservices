@@ -1,55 +1,48 @@
 package main
 
 import (
-	"auth/internal/config"
-	"auth/internal/database"
-	usersv1 "auth/internal/gen/users/v1"
-	"auth/internal/grpcclient"
-	"auth/internal/router"
-	"context"
 	"fmt"
 	"log"
 	"net"
 	"net/http"
-	"time"
+
+	"auth/internal/config"
+	usersv1 "auth/internal/gen/users/v1"
+	"auth/internal/router"
 )
 
 func main() {
 	c, err := config.Load()
-
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-
-	defer cancel()
-
-	pool, err := database.NewPool(ctx, c.DB)
-
+	// Sem chave o auth não cumpre a função principal: falha antes de abrir
+	// qualquer conexão.
+	tokens, err := newTokenService(c.JWT)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	defer pool.Close()
-
-	if err := database.Connect(ctx, pool); err != nil {
-		log.Printf("aviso: banco indisponível na subida, seguindo mesmo assim: %v", err)
-	}
-
-	userConn, err := grpcclient.NewGrpcUserClient(c.UserServerAddr)
-
+	conns, closeConns, err := openConnections(c)
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer closeConns()
 
-	defer userConn.Close()
-
-	r := router.New(router.Deps{DB: pool, Cost: c.Cost, Users: usersv1.NewUserServiceClient(userConn)})
+	r, err := router.New(router.Deps{
+		DB:         conns.db,
+		Cost:       c.Cost,
+		Users:      usersv1.NewUserServiceClient(conns.users),
+		Tokens:     tokens,
+		RefreshTTL: c.JWT.RefreshTTL,
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	p := fmt.Sprintf(":%d", c.Port)
 	listener, err := net.Listen("tcp", p)
-
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -57,9 +50,7 @@ func main() {
 	log.Printf("Server running in http://localhost:%d/api\n", c.Port)
 
 	err = http.Serve(listener, r)
-
 	if err != nil {
 		log.Fatal(err)
 	}
-
 }

@@ -1,6 +1,10 @@
 package config
 
-import "auth/internal/config/internal/env"
+import (
+	"time"
+
+	"auth/internal/config/internal/env"
+)
 
 type Database struct {
 	User     string
@@ -9,11 +13,19 @@ type Database struct {
 	Port     int
 	Host     string
 }
+type JWT struct {
+	PrivateKeyPath string
+	Issuer         string
+	TTL            time.Duration
+	RefreshTTL     time.Duration
+}
+
 type Config struct {
 	Port           int
 	DB             Database
 	Cost           int
 	UserServerAddr string
+	JWT            JWT
 }
 
 func Load() (Config, error) {
@@ -28,9 +40,14 @@ func Load() (Config, error) {
 			Port:     r.IntRange("DB_PORT", 1, 65535),
 			Host:     r.String("DB_HOST"),
 		},
-
 		Cost:           r.IntRange("HASH_COST", 4, 10),
 		UserServerAddr: r.String("USER_SERVER_ADDR"),
+		JWT: JWT{
+			PrivateKeyPath: r.String("JWT_PRIVATE_KEY_PATH"),
+			Issuer:         r.String("JWT_ISSUER"),
+			TTL:            r.DurationRange("JWT_TTL", time.Minute, 24*time.Hour),
+			RefreshTTL:     r.DurationRange("JWT_REFRESH_TTL", time.Hour, 90*24*time.Hour),
+		},
 	}
 
 	if err := r.Err(); err != nil {

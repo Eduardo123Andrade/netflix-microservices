@@ -1,7 +1,19 @@
 {
-    "gopls": {
-        "buildFlags": [
-            "-tags=integration"
-        ]
+  "gopls": {
+    "buildFlags": ["-tags=integration"],
+    "formatting.gofumpt": true
+  },
+  "go.lintTool": "golangci-lint",
+  "go.lintOnSave": "package",
+  "go.lintFlags": ["--fix"],
+  "github.copilot.enable": { "go": false },              // Copilot em Go
+  "github.copilot.nextEditSuggestions.enabled": false,    // "próxima edição" sugerida
+  "[go]": {
+    "editor.defaultFormatter": "golang.go",
+    "editor.formatOnSave": true,
+    "editor.inlineSuggest.enabled": false,   // código-fantasma (Copilot e afins)
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit"
     }
+  }
 }

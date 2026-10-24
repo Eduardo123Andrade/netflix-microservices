@@ -7,3 +7,5 @@
 
 # fake server
 local/*
+
+keys/*.pem
