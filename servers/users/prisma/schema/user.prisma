@@ -1,0 +1,11 @@
+// Email de contato: pode divergir do email de login (que vive no auth) e não
+// é único. Quem garante unicidade de login é o auth.
+model User {
+  id        String   @id
+  email     String
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}
