@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"time"
 
 	"auth/internal/entity"
 )
@@ -28,4 +29,20 @@ type userCreator interface {
 
 type userDeleter interface {
 	DeleteUser(ctx context.Context, userID string) error
+}
+
+type refreshTokenCreator interface {
+	Create(ctx context.Context, data entity.RefreshToken) error
+}
+
+type refreshTokenFinder interface {
+	FindByHash(ctx context.Context, hash string) (entity.RefreshToken, error)
+}
+
+type refreshTokenRotationMarker interface {
+	MarkRotated(ctx context.Context, refreshID string, at time.Time) error
+}
+
+type refreshFamilyRevoker interface {
+	RevokeFamily(ctx context.Context, familyID string, at time.Time) error
 }
