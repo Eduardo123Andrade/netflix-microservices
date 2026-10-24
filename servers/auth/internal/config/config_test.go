@@ -1,0 +1,138 @@
+package config
+
+import (
+	"auth/internal/config/internal/env"
+	"errors"
+	"os"
+	"reflect"
+	"strconv"
+	"strings"
+	"testing"
+	"time"
+)
+
+var expect = Config{
+	Port: 8080,
+	DB: Database{
+		User:     "test_user",
+		Password: "test_password",
+		Name:     "test_db",
+		Port:     5450,
+		Host:     "127.0.0.1",
+	},
+	Cost:           4,
+	UserServerAddr: "localhost:50051",
+	JWT: JWT{
+		PrivateKeyPath: "keys/test.pem",
+		Issuer:         "netflix-auth-test",
+		TTL:            15 * time.Minute,
+		RefreshTTL:     30 * 24 * time.Hour,
+	},
+}
+
+func initEnv(t *testing.T) {
+	t.Helper()
+	t.Setenv("PORT", strconv.Itoa(expect.Port))
+	t.Setenv("DB_USER", expect.DB.User)
+	t.Setenv("DB_PASSWORD", expect.DB.Password)
+	t.Setenv("DB_NAME", expect.DB.Name)
+	t.Setenv("DB_PORT", strconv.Itoa(expect.DB.Port))
+	t.Setenv("DB_HOST", expect.DB.Host)
+	t.Setenv("HASH_COST", strconv.Itoa(expect.Cost))
+	t.Setenv("USER_SERVER_ADDR", expect.UserServerAddr)
+	t.Setenv("JWT_PRIVATE_KEY_PATH", expect.JWT.PrivateKeyPath)
+	t.Setenv("JWT_ISSUER", expect.JWT.Issuer)
+	t.Setenv("JWT_TTL", expect.JWT.TTL.String())
+	t.Setenv("JWT_REFRESH_TTL", expect.JWT.RefreshTTL.String())
+}
+
+func TestLoad(t *testing.T) {
+	initEnv(t)
+	config, err := Load()
+
+	if err != nil {
+		t.Fatalf("Load() unexpected error: %v", err)
+	}
+
+	if !reflect.DeepEqual(config, expect) {
+		t.Errorf("Load() = %+v; want %+v", config, expect)
+	}
+}
+
+func TestLoadInvalidEnv(t *testing.T) {
+	tests := []struct {
+		name     string
+		envName  string
+		envValue string
+		unset    bool
+		wantErr  error
+	}{
+		{name: "PORT not integer", envName: "PORT", envValue: "ABC", wantErr: env.ErrNotInteger},
+		{name: "PORT out of range", envName: "PORT", envValue: "0", wantErr: env.ErrOutOfRange},
+		{name: "DB_HOST ausente", envName: "DB_HOST", unset: true, wantErr: env.ErrRequired},
+		{name: "DB_PORT empty", envName: "DB_PORT", envValue: "", wantErr: env.ErrEmpty},
+		{name: "HASH_COST ausente", envName: "HASH_COST", unset: true, wantErr: env.ErrRequired},
+		{name: "HASH_COST not integer", envName: "HASH_COST", envValue: "dez", wantErr: env.ErrNotInteger},
+		// O bcrypt troca custo < 4 pelo padrão em silêncio; a config precisa recusar.
+		{name: "HASH_COST below bcrypt minimum", envName: "HASH_COST", envValue: "3", wantErr: env.ErrOutOfRange},
+		{name: "HASH_COST above max", envName: "HASH_COST", envValue: "11", wantErr: env.ErrOutOfRange},
+		{name: "USER_SERVER_ADDR ausente", envName: "USER_SERVER_ADDR", unset: true, wantErr: env.ErrRequired},
+		{name: "USER_SERVER_ADDR empty", envName: "USER_SERVER_ADDR", envValue: "", wantErr: env.ErrEmpty},
+		{name: "JWT_PRIVATE_KEY_PATH ausente", envName: "JWT_PRIVATE_KEY_PATH", unset: true, wantErr: env.ErrRequired},
+		{name: "JWT_PRIVATE_KEY_PATH empty", envName: "JWT_PRIVATE_KEY_PATH", envValue: "", wantErr: env.ErrEmpty},
+		{name: "JWT_ISSUER ausente", envName: "JWT_ISSUER", unset: true, wantErr: env.ErrRequired},
+		{name: "JWT_ISSUER empty", envName: "JWT_ISSUER", envValue: "", wantErr: env.ErrEmpty},
+		{name: "JWT_TTL ausente", envName: "JWT_TTL", unset: true, wantErr: env.ErrRequired},
+		{name: "JWT_TTL without unit", envName: "JWT_TTL", envValue: "15", wantErr: env.ErrNotDuration},
+		// Abaixo de 1 minuto o token vence antes de o cliente conseguir usá-lo.
+		{name: "JWT_TTL below minimum", envName: "JWT_TTL", envValue: "30s", wantErr: env.ErrOutOfRange},
+		// Sem revogação, um token vazado vale até vencer; o teto limita o estrago.
+		{name: "JWT_TTL above max", envName: "JWT_TTL", envValue: "25h", wantErr: env.ErrOutOfRange},
+		{name: "JWT_REFRESH_TTL ausente", envName: "JWT_REFRESH_TTL", unset: true, wantErr: env.ErrRequired},
+		// Menos de 1h e o refresh vence quase junto com o access token: perde o sentido.
+		{name: "JWT_REFRESH_TTL below minimum", envName: "JWT_REFRESH_TTL", envValue: "30m", wantErr: env.ErrOutOfRange},
+		// Teto de 90 dias: um refresh vazado não vale para sempre.
+		{name: "JWT_REFRESH_TTL above max", envName: "JWT_REFRESH_TTL", envValue: "2161h", wantErr: env.ErrOutOfRange},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			initEnv(t)
+
+			if tt.unset {
+				os.Unsetenv(tt.envName)
+			} else {
+				t.Setenv(tt.envName, tt.envValue)
+			}
+
+			got, err := Load()
+			if !reflect.DeepEqual(got, Config{}) {
+				t.Errorf("Load() = %+v; want empty Config", got)
+			}
+			if !errors.Is(err, tt.wantErr) {
+				t.Errorf("Load() error = %v; want %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestLoadReposrtAllErrors(t *testing.T) {
+	initEnv(t)
+
+	missing := []string{"DB_HOST", "DB_USER"}
+	for _, name := range missing {
+		os.Unsetenv(name)
+	}
+
+	_, err := Load()
+	if err == nil {
+		t.Fatalf("Load() error = nil; want errors for %v", missing)
+	}
+
+	msg := err.Error()
+	for _, name := range missing {
+		if !strings.Contains(msg, name) {
+			t.Errorf("Load() error = %q; want mention of %s", msg, name)
+		}
+	}
+}

@@ -1,0 +1,19 @@
+version: v2
+
+inputs:
+  - directory: ../../contracts # qual .proto ler
+
+managed:
+  enabled: true
+  override:
+    - file_option: go_package_prefix
+      value: auth/internal/gen  # o pacote Go dos arquivos gerados
+
+plugins:
+  - local: protoc-gen-go # gera as structs das mensagens
+    out: internal/gen # onde salvar
+    opt: paths=source_relative
+
+  - local: protoc-gen-go-grpc # gera o cliente e o servidor gRPC
+    out: internal/gen
+    opt: paths=source_relative

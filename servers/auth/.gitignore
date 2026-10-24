@@ -4,3 +4,8 @@
 
 # Cobertura de testes do Go
 *.out
+
+# fake server
+local/*
+
+keys/*.pem
