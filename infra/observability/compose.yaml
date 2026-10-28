@@ -28,6 +28,7 @@ services:
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning/:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards/:/etc/grafana/dashboards:ro
 
   prometheus:
     image: prom/prometheus:v3.15.1
