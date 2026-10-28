@@ -13,6 +13,9 @@ path=$(realpath -m "$target")
 case "$path" in
   "$root/servers/users/Dockerfile"|"$root/servers/users/.dockerignore") ;&
 
+  # Exceção: dashboards do Grafana (o foco do estudo não é montar dashboard).
+  "$root/infra/observability/grafana/dashboards"/*.json) ;&
+
   "$root/.claude"/*|"$root"/*.md |"$root"/*_test.go |"$root"/*.sql |"$root/servers/users"/*) exit 0 ;;
 
   "$root"/*)

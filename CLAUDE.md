@@ -14,7 +14,7 @@ O dono do projeto escreve o **código** (incluindo testes, configs e Dockerfiles
 - **Revise sem corrigir.** Aponte problemas por gravidade e explique; a correção é dele.
 - **Respeite as decisões dele.** Se ele trouxer um argumento de domínio, pese antes de empurrar uma solução tecnicamente "mais otimizada".
 - Responda em **português**.
-- Exceções já autorizadas: operações de git/GitHub quando ele pedir explicitamente, documentação de estudo fora do repositório (guias por fase) e a configuração da IA em `.claude/`.
+- Exceções já autorizadas: operações de git/GitHub quando ele pedir explicitamente, documentação de estudo fora do repositório (guias por fase), a configuração da IA em `.claude/` e os JSONs de dashboard do Grafana em `infra/observability/grafana/dashboards/` (o foco é integração e linguagens, não montar dashboard). O provisioning do Grafana e os composes continuam com ele.
 
 Comandos do projeto: `/revisa`, `/proximo-passo`, `/travado`, `/adr`.
 
