@@ -26,11 +26,29 @@ services:
     networks:
       - netflix_services
     volumes:
-      - grafana-data:/var/lib/grafana
+      - grafana_data:/var/lib/grafana
+
+  prometheus:
+    image: prom/prometheus:v3.15.1
+    ports:
+      - 9090:9090
+    restart: unless-stopped
+    volumes:
+      - prometheus_data:/prometheus
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    networks:
+      - netflix_services
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
 networks:
   netflix_services:
     name: netflix_services
 
 volumes:
-  grafana-data:
+  grafana_data:
+  prometheus_data:
