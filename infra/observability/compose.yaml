@@ -47,6 +47,46 @@ services:
       retries: 5
       start_period: 10s
 
+  loki:
+    image: grafana/loki:3.7.9
+    restart: unless-stopped
+    command:
+      - "-config.file=/etc/loki/local-config.yaml"
+      - "-reporting.enabled=false"
+    volumes:
+      - loki_data:/loki
+    networks:
+      - netflix_services
+
+  alloy:
+    image: grafana/alloy:v1.21.3
+    command:
+      - "run"
+      - "/etc/alloy/config.alloy"
+      - "--storage.path=/var/lib/alloy/data"
+      - "--server.http.listen-addr=0.0.0.0:12345"
+    restart: unless-stopped
+    ports:
+      - "12345:12345"
+    volumes:
+      - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - alloy_data:/var/lib/alloy/data
+    networks:
+      - netflix_services
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "bash",
+          "-c",
+          "exec 3<>/dev/tcp/127.0.0.1/12345 && printf 'GET /-/ready HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q '200 OK' <&3",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
 networks:
   netflix_services:
     name: netflix_services
@@ -54,3 +94,5 @@ networks:
 volumes:
   grafana_data:
   prometheus_data:
+  loki_data:
+  alloy_data:

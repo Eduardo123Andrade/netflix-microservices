@@ -6,5 +6,5 @@ datasources:
     access: proxy
     url: http://prometheus:9090
     uid: prometheus
-    isDefault: true
+    isDefault: false
     editable: false

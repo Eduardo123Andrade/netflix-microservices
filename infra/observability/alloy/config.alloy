@@ -1,0 +1,34 @@
+
+discovery.docker "containers"  {
+    host = "unix:///var/run/docker.sock"
+}
+
+discovery.relabel "containers" {
+    targets = discovery.docker.containers.targets
+    
+    // "/observability-grafana-1" -> "observability-grafana-1"
+    rule {
+        source_labels = ["__meta_docker_container_name"]
+        regex = "/(.*)"
+        target_label = "container"
+    }
+
+    // Nome do serviço no compose (grafana, prometheus, loki...).
+    rule {
+        source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+        target_label = "service"
+    }
+}
+
+// Lê os logs dos containers descobertos.
+loki.source.docker "containers" {
+    host = "unix:///var/run/docker.sock"
+    targets = discovery.relabel.containers.output
+    forward_to = [loki.write.loki.receiver]
+}
+// Envia pro Loki.
+loki.write "loki" {
+    endpoint {
+        url = "http://loki:3100/loki/api/v1/push"
+    }
+}
