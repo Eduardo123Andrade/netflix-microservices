@@ -31,3 +31,28 @@ loki.write "loki" {
 		url = "http://loki:3100/loki/api/v1/push"
 	}
 }
+
+// Recebe logs (e depois métricas e traces) das aplicações via OTLP/HTTP.
+otelcol.receiver.otlp "default" {
+	http {
+		endpoint = "0.0.0.0:4318"
+	}
+
+	output {
+		logs = [otelcol.processor.batch.default.input]
+	}
+}
+
+// Agrupa em lotes antes de enviar.
+otelcol.processor.batch "default" {
+	output {
+		logs = [otelcol.exporter.otlphttp.loki.input]
+	}
+}
+
+// Entrega no endpoint OTLP nativo do Loki.
+otelcol.exporter.otlphttp "loki" {
+	client {
+		endpoint = "http://loki:3100/otlp"
+	}
+}
